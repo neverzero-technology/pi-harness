@@ -445,6 +445,32 @@ describe("pi-team under a real Pi host", { skip: !enabled && "set PI_TEAM_E2E=1"
 		}
 	});
 
+	test("push publishes the issue branch from the host and opens a draft PR", async () => {
+		f.linear.add("ENG-85", { assignee: USERS.dan.id, title: "Publishable" });
+		const s = f.session();
+		await s.run("/work start ENG-85", (d) => (d.method === "select" ? d.options!.find((o) => o.startsWith("Switch")) : true));
+		const branch = git(f.root, "branch", "--show-current");
+		assert.equal(branch, "linear/ENG-85-publishable");
+		write(f.root, "feature85.txt", "done\n");
+		git(f.root, "add", "-A");
+		git(f.root, "commit", "-qm", "ENG-85");
+		try {
+			const declined = await s.run("/work push", () => false);
+			assert.equal(declined.dialogs[0].title, "Publish ENG-85?");
+			assert.equal(git(f.root, "ls-remote", "--heads", "origin", branch), "", "declining pushes nothing");
+
+			const pushed = (await s.run("/work push")).messages.join("\n");
+			assert.match(pushed, /Pushed linear\/ENG-85-publishable at [0-9a-f]{12} to origin\.\nOpened draft PR: https:\/\/github\.example\/pr\/1/);
+			assert.match(git(f.root, "ls-remote", "--heads", "origin", branch), new RegExp(`^${git(f.root, "rev-parse", "HEAD")}`));
+			assert.match(readFileSync(join(f.ghDir, "pr-create.args"), "utf8"), /pr create --draft --head linear\/ENG-85-publishable --base main --title ENG-85: Publishable/);
+			const status = (await s.run("/work status")).messages.join("\n");
+			assert.match(status, /clean and pushed/);
+		} finally {
+			f.linear.get("ENG-85").state = "Done";
+			git(f.root, "switch", "-q", "main");
+		}
+	});
+
 	test("spec commands hand the method to the model in the right mode", async () => {
 		write(f.root, "docs/changes/x.md", "---\nid: x\nlinear: ENG-30\n---\n# X\n## Requirements\n### R1 — A\nText\n");
 		const s = f.session();

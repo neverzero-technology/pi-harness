@@ -129,7 +129,7 @@ async function start(team: Team, arg: string, ctx: ExtensionCommandContext): Pro
 	if (!git) throw new TeamError("Not inside a git repository");
 	const meta = parseMetadata(issue.description);
 
-	const active = await linear.issues({ team: { key: { eq: issue.team.key } }, state: { type: { eq: "started" } } });
+	const active = await linear.issues({ team: { key: { eq: issue.team.key } }, state: { type: { eq: "started" } } }, 500);
 	const others = active.filter((i) => i.identifier !== issue.identifier);
 	const myOtherActive = others.filter((i) => i.assignee?.id === viewer.id && team.isState(i, "inProgress"));
 	const overlaps = meta.spec
@@ -158,6 +158,7 @@ async function start(team: Team, arg: string, ctx: ExtensionCommandContext): Pro
 		latest,
 	});
 	if (!fetched) evaluation.notes.push(`Could not fetch ${repo.defaultRef}; comparisons use the local copy.`);
+	if (active.more) evaluation.notes.push(`More than ${active.length} issues are in progress; the checks for your other active work and for overlapping slices cover only those.`);
 	if (meta.repo && repo.profile && meta.repo !== repo.profile.name) {
 		evaluation.refuse.push(`${issue.identifier} belongs to ${meta.repo}, but this checkout is ${repo.profile.name}`);
 	}

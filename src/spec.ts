@@ -154,11 +154,14 @@ export function lintSpec(text: string, path: string, options: LintOptions): Lint
 			warnings.push({ line, message: "Unresolved placeholder" });
 		}
 
-		// Inline links only, outside inline code; a title or angle brackets around the target are allowed.
+		// Links outside inline code: inline `[text](target)`, with an optional title or angle brackets, and
+		// reference definitions `[label]: target`. A target may contain one level of balanced parentheses.
 		const prose = raw.replace(/`[^`]*`/g, "");
-		// The target may contain one level of balanced parentheses, as in a_(b).md.
-		for (const link of prose.matchAll(/\[[^\]]*\]\(\s*(<[^>]+>|(?:[^()\s]|\([^()\s]*\))+)(?:\s+"[^"]*")?\s*\)/g)) {
-			const target = link[1].replace(/^<|>$/g, "");
+		const targets = [...prose.matchAll(/\[[^\]]*\]\(\s*(<[^>]+>|(?:[^()\s]|\([^()\s]*\))+)(?:\s+"[^"]*")?\s*\)/g)].map((m) => m[1]);
+		const definition = /^\s{0,3}\[[^\]]+\]:\s*(<[^>]+>|\S+)/.exec(prose);
+		if (definition) targets.push(definition[1]);
+		for (const found of targets) {
+			const target = found.replace(/^<|>$/g, "");
 			if (/^[a-z][a-z0-9+.-]*:/i.test(target) || target.startsWith("#")) continue;
 			// `handlers[0](event)` is code, not a link: a file target has a slash or an extension.
 			if (!/[/.]/.test(target)) continue;

@@ -273,3 +273,17 @@ test("push refuses the default branch, someone else's issue, another issue's bra
 		});
 	});
 });
+
+test("start says so when there are more active issues than it could check for overlap", async () => {
+	await withLinear(async (linear) => {
+		await withGh(async () => {
+			const { root } = profiledRepo();
+			linear.add("ENG-900", { assignee: USERS.dan.id });
+			for (let i = 1; i <= 501; i++) linear.add(`ENG-${i}`, { state: "In Progress", assignee: USERS.sam.id });
+			git(root, "switch", "-qc", "linear/ENG-900-x");
+			const { work, report } = await session(root);
+			await work("start ENG-900");
+			assert.match(report(), /More than 500 issues are in progress; the checks for your other active work and for overlapping slices cover only those\./);
+		});
+	});
+});

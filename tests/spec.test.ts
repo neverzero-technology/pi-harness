@@ -184,3 +184,12 @@ test("link targets may contain parentheses", () => {
 	const errors = run(VALID_SPEC.replace("See [the plan](../../PLAN.md).", "See [p](../a_(b).md) and [q](../missing_(c).md).")).errors;
 	assert.deepEqual(errors.map((e) => e.message), ["Broken link: ../missing_(c).md"]);
 });
+
+test("reference-style link definitions are checked too", () => {
+	const { run } = setup();
+	const spec = VALID_SPEC.replace(
+		"See [the plan](../../PLAN.md).",
+		"See [the plan][plan], [the web][web] and [a gone file][gone].\n\n[plan]: ../../PLAN.md\n[web]: https://example.test/x\n[gone]: ../../MISSING.md \"title\"",
+	);
+	assert.deepEqual(run(spec).errors.map((e) => e.message), ["Broken link: ../../MISSING.md"]);
+});

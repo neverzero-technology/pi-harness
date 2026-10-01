@@ -188,7 +188,7 @@ export async function fixture(): Promise<Fixture> {
 	mkdirSync(join(ghDir, "bin"));
 	writeFileSync(
 		join(ghDir, "bin", "gh"),
-		`#!/bin/sh\ncase "$1 $2" in\n"auth status") exit 0 ;;\n"pr list") cat "${ghDir}/pr-list.json" 2>/dev/null || echo "[]" ;;\n"pr view") cat "${ghDir}/pr-view.json" ;;\n*) echo "fake gh: $*" >&2; exit 1 ;;\nesac\n`,
+		`#!/bin/sh\ncase "$1 $2" in\n"auth status") exit 0 ;;\n"pr list") cat "${ghDir}/pr-list.json" 2>/dev/null || echo "[]" ;;\n"pr view") cat "${ghDir}/pr-view.json" ;;\n"pr create") echo "$@" > "${ghDir}/pr-create.args"; echo "https://github.example/pr/1" ;;\n*) echo "fake gh: $*" >&2; exit 1 ;;\nesac\n`,
 	);
 	chmodSync(join(ghDir, "bin", "gh"), 0o755);
 
