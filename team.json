@@ -1,0 +1,35 @@
+{
+  "host": {
+    "piVersion": "0.99.2"
+  },
+  "model": {
+    "id": "openai-codex/gpt-5.5",
+    "thinking": "medium",
+    "reviewThinking": "high"
+  },
+  "linear": {
+    "teamKey": "ENG",
+    "states": {
+      "backlog": "Backlog",
+      "ready": "Ready",
+      "inProgress": "In Progress",
+      "inReview": "In Review",
+      "done": "Done",
+      "canceled": "Canceled"
+    },
+    "blockedLabel": "blocked"
+  },
+  "git": {
+    "branchPrefix": "linear/",
+    "worktreeDir": "../{repo}-worktrees"
+  },
+  "launcher": {
+    "contextFiles": true
+  },
+  "specs": {
+    "changesDir": "docs/changes",
+    "capabilitiesDir": "docs/specs",
+    "warnWords": 1500,
+    "warnRequirements": 15
+  }
+}
