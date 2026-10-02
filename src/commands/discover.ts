@@ -98,7 +98,7 @@ async function scan(team: Team, ctx: ExtensionCommandContext): Promise<void> {
 			PROFILE_GUIDE,
 			"",
 			`Templates: ${team.resource("templates", "change-specification.md")} and ${team.resource("templates", "capability-specification.md")}.`,
-			`Linear team key: ${team.config.linear.teamKey}. Do not create anything in Linear in this step.`,
+			`Linear team: ${team.config.linear.teamName} (${team.config.linear.teamKey}). Do not create anything in Linear in this step.`,
 			"Discover mode is on: you may write under .pi-team/, docs/, .github/ and root-level Markdown files, and delete old harness files with git. Product source is off limits.",
 			"Leave task ledgers in place for now: they are removed in /discover linear, once their open work is in Linear.",
 			"Finish by calling team_discover_report, committing your work, and telling the human to run /discover linear and then /discover pr.",

@@ -7,7 +7,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
-const team = JSON.parse(readFileSync(join(root, "team.json"), "utf8"));
+const team = JSON.parse(readFileSync(process.env.PI_TEAM_CONFIG || join(root, "team.json"), "utf8"));
 const pi = process.env.PI_TEAM_PI_BIN || "pi";
 const passthrough = process.argv.slice(2);
 

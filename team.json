@@ -8,10 +8,11 @@
     "reviewThinking": "high"
   },
   "linear": {
-    "teamKey": "ENG",
+    "teamName": "Neverzero",
+    "teamKey": "NEV",
     "states": {
       "backlog": "Backlog",
-      "ready": "Ready",
+      "ready": "Todo",
       "inProgress": "In Progress",
       "inReview": "In Review",
       "done": "Done",

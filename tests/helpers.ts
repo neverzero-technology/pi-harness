@@ -1,9 +1,25 @@
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
+import { mkdtempSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import type { Exec } from "../src/git.ts";
 import type { Issue, IssueRef, WorkflowState } from "../src/linear.ts";
+
+// The suites run against a fake Linear with a team "Engineering" (ENG) and a "Ready" state, whatever the
+// team's own team.json says. Everything else (host version, model, git and spec settings) is the real config.
+if (!process.env.PI_TEAM_CONFIG) {
+	const real = JSON.parse(readFileSync(fileURLToPath(new URL("../team.json", import.meta.url)), "utf8"));
+	const file = join(mkdtempSync(join(tmpdir(), "pi-team-config-")), "team.json");
+	writeFileSync(
+		file,
+		JSON.stringify({
+			...real,
+			linear: { teamName: "Engineering", teamKey: "ENG", states: { backlog: "Backlog", ready: "Ready", inProgress: "In Progress", inReview: "In Review", done: "Done", canceled: "Canceled" }, blockedLabel: "blocked" },
+		}),
+	);
+	process.env.PI_TEAM_CONFIG = file;
+}
 
 export const STATES: Record<string, WorkflowState> = {
 	backlog: { id: "s-backlog", name: "Backlog", type: "backlog" },

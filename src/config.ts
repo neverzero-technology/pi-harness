@@ -8,7 +8,8 @@ export interface TeamConfig {
 	host: { piVersion: string };
 	model: { id: string; thinking: string; reviewThinking: string };
 	linear: {
-		teamKey: string;
+		teamName: string;
+		teamKey: string; // the issue prefix, e.g. NEV in NEV-123
 		states: Record<LogicalState, string>;
 		blockedLabel: string;
 	};
@@ -19,8 +20,13 @@ export interface TeamConfig {
 
 export type LogicalState = "backlog" | "ready" | "inProgress" | "inReview" | "done" | "canceled";
 
+// PI_TEAM_CONFIG points at another team.json; the test suites use it so they do not depend on the team's own settings.
+export function teamConfigPath(root = PACKAGE_ROOT): string {
+	return process.env.PI_TEAM_CONFIG || join(root, "team.json");
+}
+
 export function loadTeamConfig(root = PACKAGE_ROOT): TeamConfig {
-	return JSON.parse(readFileSync(join(root, "team.json"), "utf8")) as TeamConfig;
+	return JSON.parse(readFileSync(teamConfigPath(root), "utf8")) as TeamConfig;
 }
 
 export function readPackageVersion(root = PACKAGE_ROOT): string {

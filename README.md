@@ -148,7 +148,7 @@ The following workflow controls apply alongside the VM boundary:
 
 - host version;
 - model and thinking levels;
-- Linear team key, state-name mapping and blocked label;
+- Linear team name and key, state-name mapping and blocked label;
 - branch prefix and worktree location;
 - spec directories and size thresholds.
 
@@ -181,7 +181,7 @@ The profile takes effect for everyone when that pull request merges. Until then 
 ### Inputs to confirm before first use
 
 - **Guest toolchain.** The stock guest image has bash, Python, Node and npm, plus git installed at session start. It has no `make`, Go, Docker or `gh`. A repository whose verify gate needs those cannot run it in the sandbox, so the agent would have to record those checks as unavailable. Build a custom Gondolin image with the toolchain (and git, to drop the per-session install) before piloting there.
-- **`linear.teamKey`** is `ENG` as a placeholder. Set the real team key and the exact workflow state names; `/team doctor` checks both.
+- **Linear team**: `team.json` names the team (`linear.teamName`) and its issue prefix (`linear.teamKey`), and maps the workflow's logical states to the team's state names. `/team doctor` checks that the key belongs to the named team and that every state exists.
 - **Labels**: create `blocked` and a `repo:<name>` label for each repository in Linear. `/team doctor` checks them for the repository you are in.
 - **`model.id`**: `openai-codex/gpt-6.1-sol` is provisional until every account is confirmed to have access to it.
 - **Package scope and registry**: `package.json` is `"private": true` so it cannot be published by accident. Remove that only under explicit publication authority.

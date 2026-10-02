@@ -1,5 +1,5 @@
 import type { ExtensionCommandContext } from "@earendil-works/pi-coding-agent";
-import { PACKAGE_ROOT, readPackageVersion } from "../config.ts";
+import { PACKAGE_ROOT, readPackageVersion, teamConfigPath } from "../config.ts";
 import { PROFILE_PATH } from "../profile.ts";
 import type { IssueRef } from "../linear.ts";
 import { MODES, type Mode } from "../modes.ts";
@@ -69,6 +69,7 @@ async function doctor(team: Team, ctx: ExtensionCommandContext): Promise<void> {
 	const { config } = team;
 
 	add("ok", "Package", `@neverzero/pi-team ${readPackageVersion()} (${PACKAGE_ROOT})`);
+	if (process.env.PI_TEAM_CONFIG) add("warn", "Team config", `${teamConfigPath()} (PI_TEAM_CONFIG), not the package's team.json`);
 	const host = await hostVersion();
 	add(host === config.host.piVersion ? "ok" : "warn", "Pi host", `${host} (tested: ${config.host.piVersion})`);
 	const launcher = process.env.PI_TEAM_LAUNCHER;
@@ -104,8 +105,10 @@ async function doctor(team: Team, ctx: ExtensionCommandContext): Promise<void> {
 			const viewer = await team.viewer();
 			add("ok", "Linear identity", `${viewer.name} <${viewer.email}> via ${key.source.startsWith("/") ? "key file" : key.source}`);
 			const linearTeam = await linear.team(config.linear.teamKey);
-			if (!linearTeam) add("fail", "Linear team", `No team with key ${config.linear.teamKey} (team.json linear.teamKey)`);
+			if (!linearTeam) add("fail", "Linear team", `No team with key ${config.linear.teamKey} (team.json linear.teamKey; the team should be "${config.linear.teamName}")`);
 			else {
+				const named = linearTeam.name.toLowerCase() === config.linear.teamName.toLowerCase();
+				add(named ? "ok" : "fail", "Linear team", named ? `${linearTeam.name} (${linearTeam.key})` : `Key ${linearTeam.key} belongs to "${linearTeam.name}", not "${config.linear.teamName}" (team.json linear.teamName / teamKey)`);
 				const states = await linear.workflowStates(linearTeam.key);
 				const missing = Object.entries(config.linear.states).filter(([, name]) => !states.some((s) => s.name.toLowerCase() === name.toLowerCase()));
 				add(missing.length ? "fail" : "ok", "Workflow states", missing.length ? `Missing: ${missing.map(([k, n]) => `${k}="${n}"`).join(", ")}` : "All mapped");
@@ -153,7 +156,7 @@ async function teamStatus(team: Team, ctx: ExtensionCommandContext): Promise<voi
 	for (const i of active) byPerson.set(i.assignee?.name ?? "unassigned", (byPerson.get(i.assignee?.name ?? "unassigned") ?? 0) + 1);
 	const multi = [...byPerson].filter(([, n]) => n > 1);
 	const out = [
-		`Team ${teamKey}`,
+		`Team ${team.config.linear.teamName} (${teamKey})`,
 		"",
 		`${states.inProgress} (${active.length}):`,
 		...active.map(fmt),
