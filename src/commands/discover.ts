@@ -107,14 +107,45 @@ async function scan(team: Team, ctx: ExtensionCommandContext): Promise<void> {
 	);
 }
 
+// Which Linear project holds this repository's work is the human's decision. The first time, they pick
+// an existing project or name a new one; after that the recorded choice is used.
+async function chooseProject(team: Team, repo: RepoContext, ctx: ExtensionCommandContext): Promise<string | undefined> {
+	const recorded = repo.profile?.linear.project ?? repo.discover.read().projectName ?? repo.discover.read().project?.name;
+	if (recorded) return recorded;
+	if (!ctx.hasUI) throw new TeamError("Choosing the Linear project needs an interactive session");
+	const suggestion = repo.profile?.name ?? repoNameFromOrigin(repo.origin) ?? "";
+	const existing = (await team.linear().projects()).map((p) => p.name).sort((a, b) => a.localeCompare(b));
+	const create = "Create a new project…";
+	const choice = await ctx.ui.select(`Which Linear project should hold the work for ${suggestion || "this repository"}?`, [...existing, create, "Cancel"]);
+	if (!choice || choice === "Cancel") return undefined;
+	let name = choice;
+	if (choice === create) {
+		const typed = await ctx.ui.input(`Name for the new Linear project${suggestion ? ` (leave empty for "${suggestion}")` : ""}`, suggestion);
+		if (typed === undefined) return undefined;
+		name = typed.trim() || suggestion;
+		if (!name) throw new TeamError("The project needs a name");
+		const clash = existing.find((e) => e.toLowerCase() === name.toLowerCase());
+		if (clash) name = clash;
+	}
+	repo.discover.update({ projectName: name });
+	return name;
+}
+
 async function linear(team: Team, ctx: ExtensionCommandContext): Promise<void> {
-	const repo = await team.requireRepo(ctx);
+	// The profile was written earlier in the adoption, so read the repository again.
+	const repo = (await team.loadRepo(ctx.cwd)) ?? (await team.requireRepo(ctx));
 	await onAdoptBranch(repo);
+	const project = await chooseProject(team, repo, ctx);
+	if (!project) {
+		ctx.ui.notify("No project chosen; nothing was changed", "info");
+		return;
+	}
 	team.setState({ mode: "discover" }, ctx);
 	team.ask(
 		[
 			`Populate Linear for this repository, following "Linear" in ${team.resource("skills", "discovery", "SKILL.md")}.`,
-			"Propose one project and the open work found in the old task ledgers, plans and PRDs, then call team_project_populate once.",
+			`The human chose the Linear project "${project}". Use exactly that project name; do not propose another.`,
+			"Propose the open work found in the old task ledgers, plans and PRDs as issues in it, then call team_project_populate once.",
 			"It shows the human a preview and creates nothing until they confirm. Finished work is not imported.",
 			`Once the tool reports the issues exist: record the project name under "linear.project" in ${PROFILE_PATH}; delete the old ledgers and the scripts that maintain them with git rm; fix any document that still points at them.`,
 			"Then call team_discover_report again with the ledgers listed as migrated to the Linear project, and commit.",
@@ -283,6 +314,10 @@ function registerDiscoverTools(team: Team): void {
 				for (const dep of issue.dependsOn) if (!sources.has(dep) || dep === issue.source) errors.push(`${issue.source} depends on ${dep}, which is not another issue in this call`);
 			}
 			if (!params.project.name.trim()) errors.push("The project needs a name");
+			const chosen = repo.profile?.linear.project ?? repo.discover.read().projectName;
+			if (chosen && chosen.toLowerCase() !== params.project.name.trim().toLowerCase()) {
+				errors.push(`The human chose the Linear project "${chosen}"; use that name, not "${params.project.name}"`);
+			}
 			if (errors.length) return text(`Proposal rejected:\n${errors.map((e) => `- ${e}`).join("\n")}`, true);
 
 			const linearClient = team.linear();

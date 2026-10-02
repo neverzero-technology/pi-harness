@@ -517,6 +517,15 @@ describe("pi-team under a real Pi host", { skip: !enabled && "set PI_TEAM_E2E=1"
 		const args = readFileSync(join(f.ghDir, "pr-create.args"), "utf8");
 		assert.match(args, /pr create --head pi-team\/adopt --base main --title Adopt the pi-team workflow --body Adopts the pi-team workflow for `acme-app`\./);
 
+		// The first /discover linear asks which project to use before the agent proposes anything.
+		f.linear.projects.push({ id: "project-Platform", name: "Platform", url: "https://linear.example/project/Platform", description: "" });
+		const asked = await s.prompt("/discover linear", (d) => (d.method === "select" ? "Create a new project…" : "Acme Invoicing"));
+		assert.deepEqual(asked.dialogs.map((d) => d.method), ["select", "input"]);
+		assert.deepEqual(asked.dialogs[0].options, ["Platform", "Create a new project…", "Cancel"]);
+		assert.match(asked.prompts[0], /The human chose the Linear project "Acme Invoicing"\. Use exactly that project name/);
+		const again = await s.prompt("/discover linear");
+		assert.equal(again.dialogs.length, 0, "the choice is remembered");
+
 		// The profile now applies on this branch, and doctor says it is not merged yet.
 		const after = (await f.session(legacy.root).run("/team doctor")).messages.join("\n");
 		assert.match(after, /! Profile: acme-app, from the working tree; it takes effect for everyone once merged to origin\/main/);

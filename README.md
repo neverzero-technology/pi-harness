@@ -172,7 +172,7 @@ Run `pi-team` in the repository and use `/discover`. It works for a repository w
    - converts unfinished PRDs, plans and proposals into change specifications under `docs/changes/`, and leaves authoritative architecture documents where they are;
    - reduces `AGENTS.md` to what the profile does not hold, and deletes old harness configuration and task ledgers;
    - files a report saying where each old file's content went, or why it was removed.
-2. **`/discover linear`** has the agent propose one Linear project and an issue for each piece of open work in the old ledgers. You see the whole proposal and nothing is created until you confirm. Finished work is not imported, nobody is assigned, and running it again reuses what exists.
+2. **`/discover linear`** first asks you which Linear project the repository's work belongs in: one of your existing projects, or a new one that you name. It asks only the first time; after that it uses the project recorded in the profile. The agent then proposes an issue for each piece of open work in the old ledgers, in that project. You see the whole proposal and nothing is created until you confirm. Finished work is not imported, nobody is assigned, and running it again reuses what exists.
 3. **`/discover status`** says what still stands between the branch and a pull request.
 4. **`/discover pr`** pushes the branch from the host and opens the pull request. Its description is built from the report, the Linear project and the actual file changes, with a review checklist. It refuses while anything is uncommitted, the profile is missing or invalid, or a deleted file is not covered by the report.
 

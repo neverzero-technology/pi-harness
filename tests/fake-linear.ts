@@ -187,6 +187,7 @@ export class FakeLinear {
 		if (query.includes("teams(")) return { teams: { nodes: variables.key === this.team.key ? [this.team] : [] } };
 		if (query.includes("workflowStates(")) return { workflowStates: { nodes: Object.keys(STATE_TYPES).map((n) => this.state(n)) } };
 		if (query.includes("projects(")) {
+			if (variables.name === undefined) return { projects: { nodes: this.projects } };
 			return { projects: { nodes: this.projects.filter((p) => p.name.toLowerCase() === String(variables.name).toLowerCase()) } };
 		}
 		if (query.includes("issueLabels(")) {

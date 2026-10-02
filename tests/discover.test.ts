@@ -471,3 +471,109 @@ test("a stray file under .pi-team/ stops the pull request", async () => {
 		});
 	});
 });
+
+test("/discover linear asks which project to use the first time, and the agent is held to the answer", async () => {
+	await withLinear(async (linear) => {
+		await withGh(async () => {
+			const { root } = legacyRepo();
+			linear.projects.push({ id: "project-Platform", name: "Platform", url: "https://linear.example/project/Platform", description: "" }, { id: "project-Billing", name: "Billing", url: "https://linear.example/project/Billing", description: "" });
+			const { h, discover, tool } = await session(root);
+			await discover();
+			adopt(root);
+			h.userMessages.length = 0;
+
+			// Cancelling asks the agent nothing.
+			h.answers.select = () => "Cancel";
+			await discover("linear");
+			assert.equal(h.selects.at(-1)!.title, "Which Linear project should hold the work for acme-app?");
+			assert.deepEqual(h.selects.at(-1)!.options, ["Billing", "Platform", "Create a new project…", "Cancel"]);
+			assert.match(h.notices.at(-1)!, /No project chosen; nothing was changed/);
+			assert.equal(h.userMessages.length, 0);
+
+			// Choosing an existing project.
+			h.answers.select = () => "Platform";
+			await discover("linear");
+			assert.equal(h.inputs.length, 0);
+			assert.match(h.userMessages.at(-1)!, /The human chose the Linear project "Platform"\. Use exactly that project name/);
+
+			// The agent cannot substitute its own project.
+			const other = await tool("team_project_populate", PROPOSAL);
+			assert.equal(other.isError, true);
+			assert.match(other.content[0].text, /The human chose the Linear project "Platform"; use that name, not "Acme"/);
+			assert.equal(linear.projects.length, 2);
+			const made = await tool("team_project_populate", { ...PROPOSAL, project: { ...PROPOSAL.project, name: "platform" } });
+			assert.equal(made.isError, undefined, made.content[0].text);
+			assert.match(h.confirms.at(-1)!.message, /Reuse project "Platform"/);
+			assert.equal(linear.projects.length, 2, "the existing project is reused");
+			assert.ok([...linear.issues.values()].every((i) => i.project === "Platform"));
+
+			// Asked once: the choice is remembered for later runs.
+			const asked = h.selects.length;
+			await discover("linear");
+			assert.equal(h.selects.length, asked);
+			assert.match(h.userMessages.at(-1)!, /The human chose the Linear project "Platform"/);
+		});
+	});
+});
+
+test("/discover linear lets the human name a new project, and skips the question once the profile records one", async () => {
+	await withLinear(async (linear) => {
+		await withGh(async () => {
+			const { root } = legacyRepo();
+			linear.projects.push({ id: "project-Platform", name: "Platform", url: "u", description: "" });
+			const { h, discover } = await session(root);
+			await discover();
+			adopt(root);
+			h.answers.select = (options) => options.find((o) => o.startsWith("Create a new project"));
+
+			// Dismissing the name prompt changes nothing.
+			h.answers.input = undefined;
+			await discover("linear");
+			assert.equal(h.inputs[0].title, 'Name for the new Linear project (leave empty for "acme-app")');
+			assert.match(h.notices.at(-1)!, /No project chosen/);
+
+			h.answers.input = "  Acme Invoicing ";
+			await discover("linear");
+			assert.match(h.userMessages.at(-1)!, /The human chose the Linear project "Acme Invoicing"/);
+
+			// A name that matches an existing project, in any case, means that project.
+			const second = legacyRepo();
+			const s2 = await session(second.root);
+			await s2.discover();
+			adopt(second.root);
+			s2.h.answers.select = (options) => options.find((o) => o.startsWith("Create a new project"));
+			s2.h.answers.input = "platform";
+			await s2.discover("linear");
+			assert.match(s2.h.userMessages.at(-1)!, /The human chose the Linear project "Platform"/);
+
+			// An empty answer takes the suggested name.
+			const third = legacyRepo();
+			const s3 = await session(third.root);
+			await s3.discover();
+			adopt(third.root);
+			s3.h.answers.select = (options) => options.find((o) => o.startsWith("Create a new project"));
+			s3.h.answers.input = "";
+			await s3.discover("linear");
+			assert.match(s3.h.userMessages.at(-1)!, /The human chose the Linear project "acme-app"/);
+
+			// Once the profile names a project, nothing is asked.
+			const fourth = legacyRepo();
+			const s4 = await session(fourth.root);
+			await s4.discover();
+			adopt(fourth.root);
+			write(fourth.root, PROFILE_PATH, JSON.stringify({ ...PROFILE, pins: [], consumers: [], linear: { label: "repo:acme-app", project: "Billing" } }));
+			await s4.discover("linear");
+			assert.equal(s4.h.selects.length, 0);
+			assert.match(s4.h.userMessages.at(-1)!, /The human chose the Linear project "Billing"/);
+
+			// Without a UI the question cannot be asked.
+			const fifth = legacyRepo();
+			const s5 = await session(fifth.root);
+			await s5.discover();
+			adopt(fifth.root);
+			s5.h.ctx.hasUI = false;
+			await s5.discover("linear");
+			assert.match(s5.h.notices.at(-1)!, /Choosing the Linear project needs an interactive session/);
+		});
+	});
+});

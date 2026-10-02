@@ -22,7 +22,8 @@ export function host(cwd: string) {
 	const thinking: string[] = [];
 	const confirms: { title: string; message: string }[] = [];
 	const selects: { title: string; options: string[] }[] = [];
-	const answers = { confirm: true, select: (options: string[]): string | undefined => options.at(-1) };
+	const inputs: { title: string; placeholder?: string }[] = [];
+	const answers = { confirm: true, select: (options: string[]): string | undefined => options.at(-1), input: undefined as string | undefined };
 	const pi: any = {
 		registerCommand: (name: string, options: any) => commands.set(name, options),
 		registerTool: (tool: any) => tools.set(tool.name, tool),
@@ -51,6 +52,10 @@ export function host(cwd: string) {
 				confirms.push({ title, message });
 				return answers.confirm;
 			},
+			input: async (title: string, placeholder?: string) => {
+				inputs.push({ title, placeholder });
+				return answers.input;
+			},
 			select: async (title: string, options: string[]) => {
 				selects.push({ title, options });
 				return answers.select(options);
@@ -63,7 +68,7 @@ export function host(cwd: string) {
 		return result;
 	};
 	registerTeam(pi, { cwd, createVm: async () => ({ exec: async () => ({ exitCode: 0, stdout: "/bin/bash\n" }), close: async () => {} }) as unknown as VM });
-	return { pi, ctx, commands, tools, entries, messages, userMessages, notices, status, thinking, confirms, selects, answers, emit };
+	return { pi, ctx, commands, tools, entries, messages, userMessages, notices, status, thinking, confirms, selects, inputs, answers, emit };
 }
 
 

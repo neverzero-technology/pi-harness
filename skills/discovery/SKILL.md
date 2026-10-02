@@ -67,7 +67,7 @@ Do not delete CI, git hooks, build configuration or anything the product needs t
 
 Do this only when asked to (`/discover linear`).
 
-- Propose one project for the repository's current body of work.
+- The human has already chosen the Linear project, an existing one or a new name; the command tells you which. Use exactly that name.
 - One issue per piece of open work: not started, in progress or blocked. Finished work is not imported.
 - For each issue:
   - `source` is where it was recorded, for example `tasks/T012.md`. It must be stable, because it is how a second run avoids duplicates.

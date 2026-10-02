@@ -98,6 +98,8 @@ export interface PopulatedProject {
 }
 
 export interface DiscoverState {
+	// The Linear project the human chose for this repository, before anything is proposed.
+	projectName?: string;
 	report?: DiscoverReport;
 	project?: PopulatedProject;
 }
