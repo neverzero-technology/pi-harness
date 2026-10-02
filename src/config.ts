@@ -1,4 +1,4 @@
-import { readdirSync, readFileSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -19,55 +19,18 @@ export interface TeamConfig {
 
 export type LogicalState = "backlog" | "ready" | "inProgress" | "inReview" | "done" | "canceled";
 
-export interface ReleasePin {
-	file: string;
-	producer: string;
-	versionField: string;
-	commitField: string;
-}
-
-export interface Profile {
-	name: string;
-	origins: string[];
-	linearLabel: string;
-	defaultBranch: string;
-	docs: string[];
-	verify: { offline: string; full?: string; selected?: string; notes: string[] };
-	generated: string[];
-	invariants: string[];
-	pin?: ReleasePin;
-	legacy: string[];
-}
-
 export function loadTeamConfig(root = PACKAGE_ROOT): TeamConfig {
 	return JSON.parse(readFileSync(join(root, "team.json"), "utf8")) as TeamConfig;
-}
-
-export function loadProfiles(root = PACKAGE_ROOT): Profile[] {
-	const dir = join(root, "profiles");
-	return readdirSync(dir)
-		.filter((f) => f.endsWith(".json"))
-		.sort()
-		.map((f) => JSON.parse(readFileSync(join(dir, f), "utf8")) as Profile);
 }
 
 export function readPackageVersion(root = PACKAGE_ROOT): string {
 	return (JSON.parse(readFileSync(join(root, "package.json"), "utf8")) as { version: string }).version;
 }
 
-// https://github.com/org/repo.git, git@github.com:org/repo and ssh://git@github.com/org/repo all become github.com/org/repo.
-export function normalizeOrigin(url: string): string {
-	let s = url.trim().replace(/\.git$/, "").replace(/\/$/, "");
-	s = s.replace(/^[a-z+]+:\/\//i, "");
-	s = s.replace(/^[^@/]+@/, "");
-	s = s.replace(/^([^/:]+):(?!\d)/, "$1/");
-	return s.toLowerCase();
-}
-
-export function profileForOrigin(profiles: Profile[], origin: string | undefined): Profile | undefined {
-	if (!origin) return undefined;
-	const normalized = normalizeOrigin(origin);
-	return profiles.find((p) => p.origins.some((o) => normalizeOrigin(o) === normalized));
+// The last path segment of an origin URL, e.g. "acme-api" for git@github.com:acme/acme-api.git.
+export function repoNameFromOrigin(url: string | undefined): string | undefined {
+	const name = url?.trim().replace(/\/+$/, "").replace(/\.git$/, "").split(/[/:]/).pop();
+	return name && /^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(name) ? name : undefined;
 }
 
 export function globToRegExp(glob: string): RegExp {

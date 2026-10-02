@@ -59,7 +59,7 @@ async function next(team: Team, ctx: ExtensionCommandContext): Promise<void> {
 	// Filter by state id: names in team.json are matched case-insensitively, Linear's filters are not.
 	const [ready, inProgress, backlog] = await Promise.all((["ready", "inProgress", "backlog"] as const).map((s) => team.stateId(teamKey, s)));
 	const base = { team: { key: { eq: teamKey } } };
-	const here = repo.profile ? { labels: { some: { name: { eq: repo.profile.linearLabel } } } } : {};
+	const here = repo.profile ? { labels: { some: { name: { eq: repo.profile.linear.label } } } } : {};
 	const [mine, unassigned, planned] = await Promise.all([
 		linear.issues({ ...base, assignee: { isMe: { eq: true } }, state: { id: { in: [ready, inProgress] } } }, 50),
 		linear.issues({ ...base, assignee: { null: true }, state: { id: { eq: ready } }, ...here }, 50),
@@ -70,7 +70,7 @@ async function next(team: Team, ctx: ExtensionCommandContext): Promise<void> {
 	const waiting = [...mine, ...unassigned].filter((r) => r.openBlockers?.length);
 	const out = ["Recommendations only; /work start claims nothing without your confirmation.", ""];
 	out.push("Assigned to you:", ...list(free(mine)), "");
-	out.push(`Unassigned ${states.ready}${repo.profile ? ` (${repo.profile.linearLabel})` : ""}:`, ...list(free(unassigned)));
+	out.push(`Unassigned ${states.ready}${repo.profile ? ` (${repo.profile.linear.label})` : ""}:`, ...list(free(unassigned)));
 	if (waiting.length) out.push("", "Waiting on prerequisites:", ...waiting.map(line));
 	// Planned slices start in Backlog while they have dependencies; nothing moves them when those finish.
 	const unblocked = free(planned);
@@ -435,7 +435,7 @@ async function push(team: Team, ctx: ExtensionCommandContext): Promise<void> {
 	else {
 		const acceptance = stripMetadata(issue.description);
 		const body = redactSecrets([`Linear: ${issue.url}`, "", "## Acceptance", acceptance.length > 4000 ? `${acceptance.slice(0, 4000)}\n…` : acceptance || "(see the issue)"].join("\n"));
-		const created = await repo.gh.createDraftPr({ head: git.branch, base, title: `${key}: ${issue.title}`, body });
+		const created = await repo.gh.createPr({ head: git.branch, base, title: `${key}: ${issue.title}`, body, draft: true });
 		out.push(created.url ? `Opened draft PR: ${created.url}` : `The branch is pushed, but the pull request was not created (${created.error}). Open it by hand.`);
 	}
 	if (dirty) out.push(`${dirty} uncommitted file(s) were left out.`);

@@ -10,8 +10,13 @@ import { globToRegExp } from "./config.ts";
 // Where the sandbox mounts the session directory (see src/sandbox.ts).
 const GUEST_WORKSPACE = "/workspace";
 
-export type Mode = "implement" | "spec" | "review";
-export const MODES: Mode[] = ["implement", "spec", "review"];
+export type Mode = "implement" | "spec" | "review" | "discover";
+export const MODES: Mode[] = ["implement", "spec", "review", "discover"];
+
+// Adoption (/discover) rewrites workflow configuration and documents, never product source.
+const DISCOVER_PATHS = [".pi-team/**", "docs/**", ".github/**", "*.md"];
+// Tools that only make sense while a repository is being adopted.
+const DISCOVER_TOOLS = new Set(["team_discover_report", "team_project_populate"]);
 
 export type GuardDecision =
 	| { action: "allow" }
@@ -31,6 +36,9 @@ export interface GuardInput {
 export function guardToolCall(g: GuardInput): GuardDecision {
 	if (/linear/i.test(g.toolName) && !g.toolName.startsWith("team_")) {
 		return { action: "block", reason: `Linear access in team sessions goes through the team_* tools, not ${g.toolName}` };
+	}
+	if (DISCOVER_TOOLS.has(g.toolName) && g.mode !== "discover") {
+		return { action: "block", reason: `${g.toolName} is only used during /discover` };
 	}
 	if (g.toolName === "team_checkpoint" && g.mode !== "implement") {
 		return { action: "block", reason: `Checkpoints record implementation progress on an issue you started; they are not used in ${g.mode} mode` };
@@ -69,8 +77,19 @@ export function guardToolCall(g: GuardInput): GuardDecision {
 		}
 	}
 
+	// The repository profile decides what the guards protect, so only /discover may write it, and it only
+	// takes effect once merged.
+	const matches = (globs: string[]) => globs.some((glob) => new RegExp(globToRegExp(glob).source, "i").test(rel));
+	if (insideRepo && g.mode !== "discover" && matches([".pi-team/**"])) {
+		return { action: "block", reason: `${rel} is the repository's workflow profile; change it with /discover and a reviewed pull request` };
+	}
+
 	if (g.mode === "review") {
 		return { action: "block", reason: "Review mode is read-only; /work start or /work resume your own issue, or /team mode implement" };
+	}
+	if (g.mode === "discover") {
+		if (insideRepo && matches(DISCOVER_PATHS)) return { action: "allow" };
+		return { action: "block", reason: `Discover mode only edits workflow configuration and documents (${DISCOVER_PATHS.join(", ")}), not product source` };
 	}
 	if (g.mode === "spec") {
 		const lower = rel.toLowerCase();

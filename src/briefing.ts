@@ -1,5 +1,5 @@
 import type { ParsedCheckpoint } from "./checkpoint.ts";
-import type { Profile } from "./config.ts";
+import type { Profile } from "./profile.ts";
 import type { Issue } from "./linear.ts";
 import { isOpen } from "./linear.ts";
 import { parseMetadata, stripMetadata } from "./metadata.ts";

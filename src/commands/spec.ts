@@ -145,18 +145,17 @@ export function registerSpec(team: Team): void {
 				if (overlapping.length) facts.push(`Other change specs touching the same capabilities: ${overlapping.join(", ")}`);
 			}
 			const profile = repo.profile;
-			if (profile?.pin) {
-				const pin = readPin(repo.root, profile.pin);
+			for (const declared of profile?.pins ?? []) {
+				const pin = readPin(repo.root, declared);
 				facts.push(
 					pin
 						? `This repo consumes ${pin.producer} ${pin.version ?? "?"} (tag ${pin.tag ?? "?"}, commit ${pin.commit ?? "?"}) per ${pin.file}. Compare producer features against that release, not the producer's latest checkout.`
-						: `Pin file ${profile.pin.file} not readable.`,
+						: `Pin file ${declared.file} not readable.`,
 				);
 			}
-			const consumers = team.profiles.filter((p) => p.pin?.producer === profile?.name);
-			if (consumers.length) {
+			if (profile?.consumers.length) {
 				facts.push(
-					`Consumers pin this repo: ${consumers.map((c) => `${c.name} via ${c.pin!.file}`).join(", ")}. A producer change reaches them only through a published release plus a pin-update issue; make that a dependency.`,
+					`Consumers pin releases of this repo: ${profile.consumers.join(", ")}. A producer change reaches them only through a published release plus a pin-update issue; make that a dependency.`,
 				);
 			}
 			team.setState({ mode: "review" }, ctx);

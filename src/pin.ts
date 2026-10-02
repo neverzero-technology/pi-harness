@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import type { ReleasePin } from "./config.ts";
+import type { ReleasePin } from "./profile.ts";
 
 export interface PinnedRelease {
 	file: string;

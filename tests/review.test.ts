@@ -2,7 +2,8 @@ import assert from "node:assert/strict";
 import { chmodSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import { test } from "node:test";
-import { loadProfiles } from "../src/config.ts";
+import { parseProfile } from "../src/profile.ts";
+import { PROFILE } from "./helpers.ts";
 import { reviewVerdict } from "../src/pending.ts";
 import { buildReviewPacket, piInvocation, REVIEW_TOOLS, runReviewer } from "../src/review.ts";
 import { tempDir, write } from "./helpers.ts";
@@ -12,7 +13,7 @@ test("reviewer tools are read-only", () => {
 });
 
 test("review packet carries acceptance, constraints, tested source and evidence", () => {
-	const profile = loadProfiles().find((p) => p.name === "foundations-idp");
+	const profile = parseProfile(JSON.stringify(PROFILE)).profile;
 	const packet = buildReviewPacket({
 		issue: "ENG-201",
 		title: "Tenant resolution",
@@ -34,7 +35,7 @@ test("review packet carries acceptance, constraints, tested source and evidence"
 	});
 	assert.match(packet, /Reject conflicting tenant input/);
 	assert.match(packet, /docs\/changes\/tenant-identity\.md/);
-	assert.match(packet, /Tenancy \(namespace, repository, RepoSync\)/);
+	assert.match(packet, /Tenancy comes from the tenant record/);
 	assert.match(packet, /templates\/generated\/\*\*/);
 	assert.match(packet, /HEAD `abc123`/);
 	assert.match(packet, /Uncommitted changes are present/);

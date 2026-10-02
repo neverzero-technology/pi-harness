@@ -110,16 +110,16 @@ test("spec staleness detects changes after the planning revision", async () => {
 	const planned = git(root, "rev-parse", "HEAD");
 	git(root, "push", "-q", "origin", "main");
 	git(root, "fetch", "-q");
-	const meta = { spec: "docs/changes/x.md", specRepo: "foundations", specCommit: planned, requirements: [] };
-	assert.equal((await specStaleness(g, meta, "foundations", "origin/main")).status, "current");
-	assert.equal((await specStaleness(g, { ...meta, specRepo: "migratory" }, "foundations", "origin/main")).status, "unverifiable");
-	assert.equal((await specStaleness(g, { requirements: [] }, "foundations", "origin/main")).status, "none");
+	const meta = { spec: "docs/changes/x.md", specRepo: "acme-app", specCommit: planned, requirements: [] };
+	assert.equal((await specStaleness(g, meta, "acme-app", "origin/main")).status, "current");
+	assert.equal((await specStaleness(g, { ...meta, specRepo: "other-app" }, "acme-app", "origin/main")).status, "unverifiable");
+	assert.equal((await specStaleness(g, { requirements: [] }, "acme-app", "origin/main")).status, "none");
 
 	write(root, "docs/changes/x.md", "v2\n");
 	git(root, "commit", "-qam", "spec v2");
 	git(root, "push", "-q", "origin", "main");
 	git(root, "fetch", "-q");
-	const changed = await specStaleness(g, meta, "foundations", "origin/main");
+	const changed = await specStaleness(g, meta, "acme-app", "origin/main");
 	assert.equal(changed.status, "changed");
 	assert.match(changed.detail, /spec v2/);
 });
@@ -140,13 +140,13 @@ test("release pin is read from the release block", () => {
 	const root = tempDir();
 	write(
 		root,
-		"foundations-release/release.lock.yaml",
-		"schema: 1\nrelease:\n  repository: neverzero-technology/foundations\n  version: 0.1.0-alpha.1\n  tag: v0.1.0-alpha.1\n  commit: 3517dd4818a7c578b65064ea55b634778bfa041d\nassets:\n  - name: x\n    version: 9.9.9\n",
+		"release.lock.yaml",
+		"schema: 1\nrelease:\n  repository: example/platform\n  version: 0.1.0-alpha.1\n  tag: v0.1.0-alpha.1\n  commit: 3517dd4818a7c578b65064ea55b634778bfa041d\nassets:\n  - name: x\n    version: 9.9.9\n",
 	);
-	const pin = readPin(root, { file: "foundations-release/release.lock.yaml", producer: "foundations", versionField: "version", commitField: "commit" });
+	const pin = readPin(root, { file: "release.lock.yaml", producer: "platform", versionField: "version", commitField: "commit" });
 	assert.deepEqual(pin, {
-		file: "foundations-release/release.lock.yaml",
-		producer: "foundations",
+		file: "release.lock.yaml",
+		producer: "platform",
 		version: "0.1.0-alpha.1",
 		commit: "3517dd4818a7c578b65064ea55b634778bfa041d",
 		tag: "v0.1.0-alpha.1",

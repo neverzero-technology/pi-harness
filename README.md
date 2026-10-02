@@ -1,6 +1,6 @@
 # pi-team
 
-One Pi package that gives the team the same lightweight process across Foundations, Foundations IDP and Migratory:
+One Pi package that brings the team's working process to any repository:
 
 - bounded change specs;
 - Linear as the single record of ownership and progress;
@@ -16,7 +16,8 @@ One Pi package that gives the team the same lightweight process across Foundatio
 | Assignment, state, blockers, dependencies, checkpoints | Linear |
 | Branches, commits, PRs, integration | Git and GitHub |
 | Unsynced recovery data and agent review records | `.git/pi-team/` (local only, never shared progress) |
-| Workflow behaviour and defaults | This package (`team.json`, `profiles/`) |
+| Team-wide behaviour and defaults | This package (`team.json`) |
+| One repository's rules for the workflow | That repository's `.pi-team/profile.json`, in force once merged to its default branch |
 
 ## Install and run
 
@@ -64,7 +65,7 @@ Authentication is individual. Never share `auth.json`, keys or tokens.
 | `/spec draft <issue\|idea>` | The agent picks a proportionate path, then drafts `docs/changes/<id>.md` from the template | Spec mode: edits outside `docs/` are blocked |
 | `/spec lint [path]` | Structural check: frontmatter, sections, requirement IDs, scenarios, links, `BLOCKING:` questions, size | Deterministic |
 | `/grill <spec\|issue>` | One question at a time; answers recorded as decisions | Spec mode |
-| `/align <spec\|issue>` | Report of blocking contradictions, decisions required, verification gaps and what is aligned | Review mode (read-only); adds lint, capability overlap and the IDP release pin as facts |
+| `/align <spec\|issue>` | Report of blocking contradictions, decisions required, verification gaps and what is aligned | Review mode (read-only); adds lint, capability overlap and any release pins the profile declares as facts |
 | `/spec plan <spec>` | Turn an approved spec into small dependent Linear issues | Lint and blocking questions gate it; unapproved specs are preview-only; same slice key means reuse; the human confirms before creation |
 | `/work next` | Recommends your unblocked work, unassigned Ready issues for this repo, and planned Backlog slices whose prerequisites are done | Never claims anything |
 | `/work start <issue>` | Ownership and checkout preflight, then a briefing for the session | Refuses another person's issue or another repo's issue; one confirmation per exception; all decisions are taken before anything changes; ownership is re-read just before writing; worktree or branch switch; a start checkpoint that never overwrites earlier progress (a handoff carries the previous owner's remaining work forward) |
@@ -75,6 +76,7 @@ Authentication is individual. Never share `auth.json`, keys or tokens.
 | `/review [issue]` | Fresh `pi` process with a read-only Gondolin workspace and `read`/`grep`/`find`/`ls` only reviews the diff against acceptance and constraints | Verdict and commit recorded per issue in `.git/pi-team/reviews/` only when the tree was clean; flags open PRs touching the same files |
 | `/work push` | Pushes the issue branch to origin from the host and opens a draft PR if none is open | Owner only; issue branch only, never the default branch; confirmed first; never forced; uncommitted files are left out |
 | `/work finish [issue]` | Reports each completion condition, has the agent assess acceptance into a final checkpoint, then offers In Review or Done | See "What finish checks" below; every transition needs the human's confirmation |
+| `/discover` then `/discover linear`, `status`, `pr` | Adopts the workflow in an existing repository; see "Adopting a repository" | Own branch from a clean checkout; discover mode edits only workflow configuration and documents; every deleted file must be accounted for; Linear writes are previewed and confirmed; the PR is raised from the host |
 | `/team doctor` / `setup` / `version` / `status` / `mode <implement\|spec\|review>` | Setup check, sign-in steps, versions, team-wide view of active, in-review and Ready work, and manual mode switch | |
 
 The agent-facing tools are:
@@ -107,19 +109,23 @@ The commit the evidence is judged at is your HEAD while the PR is open, and the 
 /work start ENG-201 → implement, commit, checkpoint → /work push → /review → /work finish (→ In Review)
 → another person reviews and merges the PR → /work finish (→ Done)
 /work resume ENG-201        # after a crash, context rotation or handoff
+
+/discover → the agent writes the profile, converts and removes old material, files its report, commits
+→ /discover linear → /discover pr → another person reviews and merges (the profile is now in force)
 ```
 
 ## Guards and their limits
 
 Gondolin runs `read`, `write`, `edit`, `bash`, `grep`, `find`, `ls`, and user `!`/`!!` shell commands inside a Linux micro-VM. The current working directory is mounted at `/workspace` and its original absolute path; changes write through to the host. Start at the repository root. Each session gets a disposable VM: guest-installed packages and files outside the mounts disappear when it closes. Cancelling or timing out a shell command closes the VM to stop all guest processes; the next tool call boots a fresh VM. The harness installs Bash, Git, Node.js and npm in the default Alpine guest automatically. It may require extra build tools; install them inside the guest with `!apk add ...`, or select a suitable Gondolin image with `GONDOLIN_DEFAULT_IMAGE`. Native dependencies must be installed for Linux; host macOS binaries in `node_modules` will not work in the guest.
 
-Harness skills, templates, review instructions and profiles are mounted read-only. Linked worktrees also mount their shared Git metadata at its original path, so Git works without exposing the main checkout. `/work start` still creates sibling worktrees on the host; follow its `cd ... && pi-team` instruction to start a new VM there. The independent reviewer has read-only workspace and Git mounts, no shell tools, and no team/Linear tools.
+Harness skills, templates and review instructions are mounted read-only. Linked worktrees also mount their shared Git metadata at its original path, so Git works without exposing the main checkout. `/work start` still creates sibling worktrees on the host; follow its `cd ... && pi-team` instruction to start a new VM there. The independent reviewer has read-only workspace and Git mounts, no shell tools, and no team/Linear tools.
 
 Host environment variables are not forwarded to guest commands, including API keys, `LINEAR_API_KEY`, `PATH`, and SSH-agent sockets. Host Pi authentication, trusted workflow commands, Git/GitHub helpers, Linear requests, session storage and explicit user attachments remain on the host. Gondolin isolates repository tools; it does not sandbox the Pi process or trusted extension code. Install the harness outside agent-writable repositories. Workspace files such as `.env` are still visible when they are part of a mount. Guest network access uses Gondolin's default policy; this harness does not add a destination allowlist.
 
 The following workflow controls apply alongside the VM boundary:
 
-- **Generated paths**: writes and edits to a profile's generated globs are blocked in every mode. For IDP that covers `templates/generated/**`, `catalog/generated/**` and the rest of the list. Paths are resolved the way Pi's own write and edit tools resolve them.
+- **Generated paths**: writes and edits to the globs a repository's profile lists as generated are blocked in every mode. Paths are resolved the way Pi's own write and edit tools resolve them.
+- **The profile itself**: `.pi-team/` can only be written in discover mode, and the copy on the default branch is the one in force, so a local edit changes nothing until a pull request merges it.
 - **Spec mode**: edits only under `docs/`. Spec and review modes raise the thinking level to the team's review setting; implement mode restores the default.
 - **Review mode**: no write or edit at all.
 - **Secrets**: text posted to Linear (checkpoints, block reasons, planned issues) is passed through a redactor for common key and token formats. It is a backstop, not a licence to paste secrets.
@@ -146,32 +152,40 @@ The following workflow controls apply alongside the VM boundary:
 - branch prefix and worktree location;
 - spec directories and size thresholds.
 
-`profiles/*.json` holds one file per repository, matched by Git origin rather than directory name. Each has:
+Each repository holds its own rules in `.pi-team/profile.json`:
 
-- documentation entry points;
-- verification commands and notes;
-- generated globs;
-- domain invariants;
-- the Linear repository label;
-- the release pin (IDP reads `foundations-release/release.lock.yaml`);
-- legacy harness paths to retire.
+- `name`, and the Linear label (`repo:<name>` by default) and project for its issues;
+- `docs`: the documents an agent reads first;
+- `verify`: the offline gate, optional selected and full gates, and notes on what each proves;
+- `generated`: globs of files that must not be hand-edited;
+- `invariants`: the rules a change must not break, in the repository's own terms;
+- `pins` and `consumers`: releases of other repositories it pins, and repositories that pin it.
 
-Changes to either are package releases: bump the version, run `npm run check` and `npm run smoke:pack`, then pilot.
+The package ships no repository profiles. A change to `team.json` is a package release: bump the version, run `npm run check` and `npm run smoke:pack`, then pilot. A change to a profile is a pull request in that repository.
+
+## Adopting a repository
+
+Run `pi-team` in the repository and use `/discover`. It works for a repository with no agent setup at all, and for one that already has another harness, its own specification format, PRDs or a task ledger.
+
+1. **`/discover`** switches to a `pi-team/adopt` branch from a clean checkout of the default branch and lists what it found by name: agent instruction files, harness configuration (`.claude/`, `.codex/`, `.cursor/`, Spec Kit, Kiro, OpenSpec and similar), specifications and plans, task ledgers, verification entry points, CI and hooks. The agent then, following the discovery skill:
+   - writes `.pi-team/profile.json` from the repository's own documents and scripts;
+   - converts unfinished PRDs, plans and proposals into change specifications under `docs/changes/`, and leaves authoritative architecture documents where they are;
+   - reduces `AGENTS.md` to what the profile does not hold, and deletes old harness configuration and task ledgers;
+   - files a report saying where each old file's content went, or why it was removed.
+2. **`/discover linear`** has the agent propose one Linear project and an issue for each piece of open work in the old ledgers. You see the whole proposal and nothing is created until you confirm. Finished work is not imported, nobody is assigned, and running it again reuses what exists.
+3. **`/discover status`** says what still stands between the branch and a pull request.
+4. **`/discover pr`** pushes the branch from the host and opens the pull request. Its description is built from the report, the Linear project and the actual file changes, with a review checklist. It refuses while anything is uncommitted, the profile is missing or invalid, or a deleted file is not covered by the report.
+
+The profile takes effect for everyone when that pull request merges. Until then it applies only on the adoption branch, and `/team doctor` says so.
 
 ### Inputs to confirm before first use
 
-- **Guest toolchain.** The stock guest image has bash, Python, Node and npm, plus git installed at session start. It has no `make`, Go, Docker or `gh`. Migratory's `make verify` and Foundations' full `./scripts/verify` cannot run in it, so the agent would have to record those checks as unavailable. Build a custom Gondolin image with each repository's toolchain (and git, to drop the per-session install) before piloting there.
+- **Guest toolchain.** The stock guest image has bash, Python, Node and npm, plus git installed at session start. It has no `make`, Go, Docker or `gh`. A repository whose verify gate needs those cannot run it in the sandbox, so the agent would have to record those checks as unavailable. Build a custom Gondolin image with the toolchain (and git, to drop the per-session install) before piloting there.
 - **`linear.teamKey`** is `ENG` as a placeholder. Set the real team key and the exact workflow state names; `/team doctor` checks both.
-- **Labels**: create `blocked`, `repo:foundations`, `repo:foundations-idp` and `repo:migratory` in Linear, or edit the profiles.
-- **`model.id`**: `openai-codex/gpt-5.5` is provisional until all five accounts are confirmed to have access to it.
+- **Labels**: create `blocked` and a `repo:<name>` label for each repository in Linear. `/team doctor` checks them for the repository you are in.
+- **`model.id`**: `openai-codex/gpt-5.5` is provisional until every account is confirmed to have access to it.
 - **Package scope and registry**: `package.json` is `"private": true` so it cannot be published by accident. Remove that only under explicit publication authority.
 
-### Migration notes from the repositories
-
-- **Migratory**: `tasks/` with `scripts/tasks.sh` and `.claude/commands/task-*.md` form a second progress ledger. Move active and blocked tasks to Linear and retire that ledger before piloting there. `AGENTS.md` names `tasks/README.md` as the progress source of truth.
-- **Foundations**: `.codex/agents/*` role definitions are not loaded by Pi and need no change. There is no PR CI, so local evidence recorded against the tested commit carries the weight.
-- **Foundations IDP**: the release pin is one minor version behind Foundations' `release.yaml`, which `/align` will surface for producer changes.
-- **All three**: none has `docs/changes/` yet. The first `/spec draft` creates it. Existing `PLAN.md`, `spec.md` and the architecture documents stay authoritative and are not rewritten to a template.
 
 ## Development
 
@@ -180,7 +194,7 @@ npm install
 npm run check            # type-check + unit tests (fake VM/Linear, real git in temp repos)
 npm run test:sandbox     # real Gondolin VMs; needs QEMU and guest assets
 npm run test:e2e         # workflow scenarios driving the real Pi host over RPC, with a fake Linear and fake gh
-npm run check:linear     # validates all 17 GraphQL operations against Linear's published schema
+npm run check:linear     # validates all 20 GraphQL operations against Linear's published schema
 PI_TEAM_SMOKE_PI=1 npm run smoke:pack   # packed tarball; also loads it in the real Pi host
 ```
 

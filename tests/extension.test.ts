@@ -10,10 +10,13 @@ function idpRepo() {
 	return profiledRepo().root;
 }
 
-test("registers six command families, five team tools and seven sandbox tools", () => {
+test("registers seven command families, seven team tools and seven sandbox tools", () => {
 	const h = host("/");
-	assert.deepEqual([...h.commands.keys()].sort(), ["align", "grill", "review", "spec", "team", "work"]);
-	assert.deepEqual([...h.tools.keys()].sort(), ["bash", "edit", "find", "grep", "ls", "read", "team_checkpoint", "team_issue_read", "team_issue_search", "team_plan_slices", "team_spec_lint", "write"]);
+	assert.deepEqual([...h.commands.keys()].sort(), ["align", "discover", "grill", "review", "spec", "team", "work"]);
+	assert.deepEqual(
+		[...h.tools.keys()].sort(),
+		["bash", "edit", "find", "grep", "ls", "read", "team_checkpoint", "team_discover_report", "team_issue_read", "team_issue_search", "team_plan_slices", "team_project_populate", "team_spec_lint", "write"],
+	);
 	for (const name of ["team_issue_read", "team_issue_search", "team_spec_lint"]) assert.equal(h.tools.get(name).annotations.readOnlyHint, true);
 });
 
@@ -22,7 +25,7 @@ test("session start resolves the profile and infers the issue from the branch", 
 	git(root, "switch", "-qc", "linear/ENG-12-tenant");
 	const h = host(root);
 	await h.emit("session_start", { type: "session_start", reason: "startup" });
-	assert.equal(h.status.get("pi-team"), "foundations-idp · ENG-12 · implement");
+	assert.equal(h.status.get("pi-team"), "acme-app · ENG-12 · implement");
 });
 
 test("guards follow the mode and the repository's generated paths", async () => {
@@ -71,14 +74,15 @@ test("/grill and /align switch mode and hand the method to the model", async () 
 	assert.match(h.userMessages.at(-1)!, /Linear issue ENG-5/);
 	assert.match(h.status.get("pi-team")!, /spec$/);
 	await h.commands.get("align")!.handler("ENG-5", h.ctx);
-	assert.match(h.userMessages.at(-1)!, /This repo consumes foundations|Pin file/);
+	assert.match(h.userMessages.at(-1)!, /Pin file release\.lock\.yaml not readable/);
+	assert.match(h.userMessages.at(-1)!, /Consumers pin releases of this repo: portal/);
 	assert.match(h.status.get("pi-team")!, /review$/);
 });
 
 const SPEC = "docs/changes/tenant-identity.md";
 const slices = [
-	{ key: "tenant-identity/resolve", title: "Resolve tenant server-side", acceptance: "Reject conflicting input.", requirements: ["R1"], repo: "foundations-idp", surfaces: ["backstage/plugins/scaffolder"], verification: "unit tests (local)", dependsOn: [] },
-	{ key: "tenant-identity/audit", title: "Audit rejections", acceptance: "Rejections are logged.", requirements: ["R2"], repo: "foundations-idp", surfaces: [], verification: "unit tests (local)", dependsOn: ["tenant-identity/resolve"] },
+	{ key: "tenant-identity/resolve", title: "Resolve tenant server-side", acceptance: "Reject conflicting input.", requirements: ["R1"], repo: "acme-app", surfaces: ["services/deploy"], verification: "unit tests (local)", dependsOn: [] },
+	{ key: "tenant-identity/audit", title: "Audit rejections", acceptance: "Rejections are logged.", requirements: ["R2"], repo: "acme-app", surfaces: [], verification: "unit tests (local)", dependsOn: ["tenant-identity/resolve"] },
 ];
 
 async function planningHost(linear: FakeLinear, merge = true) {
@@ -107,11 +111,11 @@ test("planning creates dependent issues from an approved spec and never duplicat
 		const [resolve, audit] = created;
 		assert.equal(resolve.state, "Ready");
 		assert.equal(audit.state, "Backlog", "a slice with open dependencies is not ready");
-		assert.deepEqual(resolve.labels, ["repo:foundations-idp"]);
+		assert.deepEqual(resolve.labels, ["repo:acme-app"]);
 		assert.equal(resolve.project, "Tenancy");
 		assert.match(resolve.description, /^Reject conflicting input\.\n\n\*\*Requirements:\*\* R1/);
 		const head = git(root, "rev-parse", "HEAD").slice(0, 12);
-		assert.ok(resolve.description.includes(`- spec: \`foundations-idp:${SPEC}@${head}\``));
+		assert.ok(resolve.description.includes(`- spec: \`acme-app:${SPEC}@${head}\``));
 		assert.ok(resolve.description.includes("- slice: `tenant-identity/resolve`"));
 		assert.deepEqual(linear.relations, [{ blocker: resolve.id, blocked: audit.id }]);
 
@@ -163,9 +167,9 @@ test("planning is preview-only for an unmerged spec, a declined preview or an in
 		declined.h.answers.confirm = false;
 		assert.match((await declined.plan({ spec: SPEC, slices })).content[0].text, /declined; nothing was created/);
 
-		const invalid = await declined.plan({ spec: SPEC, slices: [{ ...slices[0], requirements: ["R9"], repo: "nowhere" }] });
+		const invalid = await declined.plan({ spec: SPEC, slices: [{ ...slices[0], requirements: ["R9"], repo: "not a repo" }] });
 		assert.equal(invalid.isError, true);
-		assert.match(invalid.content[0].text, /Unknown repo/);
+		assert.match(invalid.content[0].text, /Not a repository name .* this repository is acme-app/);
 		const unknownReq = await declined.plan({ spec: SPEC, slices: [{ ...slices[0], requirements: ["R9"] }] });
 		assert.match(unknownReq.content[0].text, /not in the spec: R9/);
 

@@ -63,18 +63,18 @@ test("latest checkpoint ignores ordinary comments and picks the newest", () => {
 
 test("issue metadata round-trips and strips cleanly", () => {
 	const footer = formatMetadata({
-		repo: "foundations-idp",
+		repo: "acme-app",
 		spec: "docs/changes/tenant-identity.md",
-		specRepo: "foundations-idp",
+		specRepo: "acme-app",
 		specCommit: "abcdef0123456789",
 		slice: "tenant-identity/resolve",
 		requirements: ["R1", "R2"],
 	});
 	const description = `Do the thing.\n\n**Verification:** tests\n\n${footer}`;
 	assert.deepEqual(parseMetadata(description), {
-		repo: "foundations-idp",
+		repo: "acme-app",
 		spec: "docs/changes/tenant-identity.md",
-		specRepo: "foundations-idp",
+		specRepo: "acme-app",
 		specCommit: "abcdef012345",
 		slice: "tenant-identity/resolve",
 		requirements: ["R1", "R2"],
@@ -94,9 +94,9 @@ test("parsing survives Markdown normalisation by Linear", () => {
 	assert.equal(parsed?.checks[0].dirty, true);
 	assert.equal(parsed?.checks[0].commit, "0123456789ab");
 
-	const footer = formatMetadata({ repo: "migratory", spec: "docs/changes/x.md", specRepo: "migratory", specCommit: "abc123abc123", slice: "x/a", requirements: ["R1"] });
+	const footer = formatMetadata({ repo: "other-app", spec: "docs/changes/x.md", specRepo: "other-app", specCommit: "abc123abc123", slice: "x/a", requirements: ["R1"] });
 	const normalised = `Acceptance\n\n${footer}`.replace(/^- /gm, "* ").replace("---", "***").replace(/`/g, "");
-	assert.deepEqual(parseMetadata(normalised), { repo: "migratory", spec: "docs/changes/x.md", specRepo: "migratory", specCommit: "abc123abc123", slice: "x/a", requirements: ["R1"] });
+	assert.deepEqual(parseMetadata(normalised), { repo: "other-app", spec: "docs/changes/x.md", specRepo: "other-app", specCommit: "abc123abc123", slice: "x/a", requirements: ["R1"] });
 	assert.equal(stripMetadata(normalised), "Acceptance");
 });
 
@@ -157,13 +157,13 @@ test("a comment without a Remaining section is not read as nothing remaining", (
 });
 
 test("the metadata footer is only its own block", () => {
-	const footer = formatMetadata({ repo: "migratory", slice: "x/a", requirements: ["R1"] });
+	const footer = formatMetadata({ repo: "other-app", slice: "x/a", requirements: ["R1"] });
 	// Text a person adds after the footer is still acceptance.
 	const appended = `Do the thing.\n\n${footer}\n\nAlso handle the empty case.`;
 	assert.equal(stripMetadata(appended), "Do the thing.\n\nAlso handle the empty case.");
 	assert.equal(parseMetadata(appended).slice, "x/a");
 	// A bold mention in prose is not a footer.
-	const prose = "Use the **pi-team** workflow for this.\n- repo: `foundations`";
+	const prose = "Use the **pi-team** workflow for this.\n- repo: `platform`";
 	assert.equal(stripMetadata(prose), prose);
 	assert.deepEqual(parseMetadata(prose), { requirements: [] });
 });
@@ -207,10 +207,10 @@ test("credential assignments are redacted whatever the variable prefix; slugs ar
 });
 
 test("the footer survives a blank line after its heading and leaves a person's bullets alone", () => {
-	const spaced = "Do it.\n\n***\n\n**pi-team**\n\n* repo: `migratory`\n* slice: `x/a`\n* requirements: R1, R2";
-	assert.deepEqual(parseMetadata(spaced), { repo: "migratory", slice: "x/a", requirements: ["R1", "R2"] });
+	const spaced = "Do it.\n\n***\n\n**pi-team**\n\n* repo: `other-app`\n* slice: `x/a`\n* requirements: R1, R2";
+	assert.deepEqual(parseMetadata(spaced), { repo: "other-app", slice: "x/a", requirements: ["R1", "R2"] });
 	assert.equal(stripMetadata(spaced), "Do it.");
-	const footer = formatMetadata({ repo: "migratory", slice: "x/a", requirements: ["R1"] });
+	const footer = formatMetadata({ repo: "other-app", slice: "x/a", requirements: ["R1"] });
 	const withNote = `Do it.\n\n${footer}\n- Also: handle the empty tenant case`;
 	assert.match(stripMetadata(withNote), /^Do it\.\n\n- Also: handle the empty tenant case$/);
 	assert.equal(parseMetadata(withNote).slice, "x/a");

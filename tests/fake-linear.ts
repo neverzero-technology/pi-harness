@@ -35,7 +35,8 @@ const STATE_TYPES: Record<string, string> = {
 export class FakeLinear {
 	viewer = USERS.dan;
 	team = { id: "team-eng", key: "ENG", name: "Engineering" };
-	labels = ["blocked", "repo:foundations", "repo:foundations-idp", "repo:migratory"];
+	labels = ["blocked", "repo:acme-app", "repo:other-app"];
+	projects: { id: string; name: string; url: string; description: string }[] = [];
 	issues = new Map<string, FakeIssue>();
 	relations: { blocker: string; blocked: string }[] = []; // issue ids
 	// Convert list bullets the way a Markdown round-trip might, to prove parsing tolerates it.
@@ -185,6 +186,9 @@ export class FakeLinear {
 		if (query.includes("viewer {")) return { viewer: this.viewer };
 		if (query.includes("teams(")) return { teams: { nodes: variables.key === this.team.key ? [this.team] : [] } };
 		if (query.includes("workflowStates(")) return { workflowStates: { nodes: Object.keys(STATE_TYPES).map((n) => this.state(n)) } };
+		if (query.includes("projects(")) {
+			return { projects: { nodes: this.projects.filter((p) => p.name.toLowerCase() === String(variables.name).toLowerCase()) } };
+		}
 		if (query.includes("issueLabels(")) {
 			const name = this.labels.find((l) => l.toLowerCase() === String(variables.name).toLowerCase());
 			return { issueLabels: { nodes: name ? [{ id: `label-${name}`, team: null }] : [] } };
@@ -216,6 +220,12 @@ export class FakeLinear {
 	}
 
 	private mutate(query: string, variables: Record<string, any>): unknown {
+		if (query.includes("projectCreate")) {
+			const name = variables.input.name;
+			const project = { id: `project-${name}`, name, url: `https://linear.example/project/${encodeURIComponent(name)}`, description: variables.input.description };
+			this.projects.push(project);
+			return { projectCreate: { success: true, project: { id: project.id, name, url: project.url } } };
+		}
 		if (query.includes("issueCreate")) {
 			const input = variables.input;
 			const identifier = `ENG-${++this.seq}`;

@@ -38,6 +38,9 @@ await record("issues: search", () =>
 	client.issues({ ...team, state: { type: { nin: ["completed", "canceled"] } }, and: [{ or: [{ title: { containsIgnoreCase: "q" } }, { description: { containsIgnoreCase: "q" } }] }] }, 30),
 );
 await record("issues: slice keys", () => client.issues({ ...team, or: [{ description: { contains: "spec/slice" } }] }, 100));
+await record("project", () => client.project("Acme"));
+await record("createProject", () => client.createProject({ name: "Acme", description: "d", teamIds: ["t"] }));
+await record("issues: /discover sources", () => client.issues({ ...team, or: [{ description: { contains: "tasks/T001.md" } }] }, 500));
 await record("createIssue", () => client.createIssue({ teamId: "t", title: "x", description: "d", labelIds: ["l"], projectId: "p", stateId: "s" }));
 await record("createBlocksRelation", () => client.createBlocksRelation("a", "b"));
 await record("comment", () => client.comment("i", "body"));

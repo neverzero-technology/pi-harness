@@ -25,7 +25,8 @@ const required = [
 	"src/runtime.ts",
 	"skills/specification/SKILL.md",
 	"skills/delivery/SKILL.md",
-	"profiles/foundations-idp.json",
+	"src/profile.ts",
+	"skills/discovery/SKILL.md",
 	"templates/change-specification.md",
 	"review/independent-review.md",
 ];
@@ -46,7 +47,7 @@ if (process.env.PI_TEAM_SMOKE_PI === "1") {
 	const repo = join(work, "repo");
 	mkdirSync(join(repo, "docs/changes"), { recursive: true });
 	execFileSync("git", ["init", "-q", "-b", "main"], { cwd: repo });
-	execFileSync("git", ["remote", "add", "origin", "https://github.com/neverzero-technology/foundations.git"], { cwd: repo });
+	execFileSync("git", ["remote", "add", "origin", "https://github.com/example/app.git"], { cwd: repo });
 	writeFileSync(join(repo, "docs/changes/x.md"), "---\nid: x\nlinear: ENG-1\n---\n# X\n");
 	const out = execFileSync(process.execPath, [join(pkg, "bin/pi-team.mjs"), "--mode", "json", "-p", "--no-session", "--offline", "/spec lint"], {
 		cwd: repo,

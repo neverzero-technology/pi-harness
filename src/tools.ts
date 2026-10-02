@@ -186,7 +186,7 @@ export function registerTools(team: Team): void {
 					title: Type.String(),
 					acceptance: Type.String({ description: "Concrete acceptance for this slice (Markdown)" }),
 					requirements: Type.Array(Type.String(), { description: "Requirement IDs from the spec" }),
-					repo: Type.String({ description: "Profile name of the repository that implements this slice" }),
+					repo: Type.String({ description: "Name of the repository that implements this slice (this repository's profile name unless the slice belongs to a producer or consumer)" }),
 					surfaces: Type.Array(Type.String(), { description: "Affected files, schemas, resources or APIs" }),
 					verification: Type.String({ description: "Checks that prove this slice, with scope" }),
 					dependsOn: Type.Array(Type.String(), { description: "Slice keys that must finish first" }),
@@ -203,11 +203,9 @@ export function registerTools(team: Team): void {
 				return text(`Spec is not plannable:\n${formatLint(lint, path)}`, true);
 			}
 			if (!repo.profile) return text("This repository has no pi-team profile, so slices cannot record where their spec lives.", true);
-			const profileNames = team.profiles.map((p) => p.name);
-			const badRepo = params.slices.filter((s) => !profileNames.includes(s.repo));
-			if (badRepo.length) {
-				return text(`Unknown repo for ${badRepo.map((s) => s.key).join(", ")}; use one of ${profileNames.join(", ")}`, true);
-			}
+			// A slice may belong to another repository (a producer or consumer); it is labelled repo:<name>.
+			const badRepo = params.slices.filter((s) => !/^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(s.repo));
+			if (badRepo.length) return text(`Not a repository name for ${badRepo.map((s) => s.key).join(", ")}; this repository is ${repo.profile.name}`, true);
 
 			const approval = await specApproval(repo.git, repo.root, path, repo.defaultRef);
 			const linear = team.linear();
@@ -270,9 +268,9 @@ export function registerTools(team: Team): void {
 			const created: string[] = [];
 			try {
 				for (const slice of plan.create) {
-					const profile = team.profiles.find((p) => p.name === slice.repo)!;
-					if (!labelCache.has(profile.linearLabel)) labelCache.set(profile.linearLabel, await linear.labelId(profile.linearLabel, teamInfo.id));
-					const label = labelCache.get(profile.linearLabel);
+					const labelName = slice.repo === repo.profile.name ? repo.profile.linear.label : `repo:${slice.repo}`;
+					if (!labelCache.has(labelName)) labelCache.set(labelName, await linear.labelId(labelName, teamInfo.id));
+					const label = labelCache.get(labelName);
 					const description = redactSecrets(
 						[
 						slice.acceptance.trim(),
@@ -300,7 +298,7 @@ export function registerTools(team: Team): void {
 						stateId: slice.dependsOn.length ? backlogId : readyId,
 					});
 					ids.set(slice.key, issue.id);
-					created.push(`${slice.key} → ${issue.identifier} ${issue.url}${label ? "" : ` (no "${profile.linearLabel}" label found)`}`);
+					created.push(`${slice.key} → ${issue.identifier} ${issue.url}${label ? "" : ` (no "${labelName}" label found)`}`);
 				}
 				for (const link of links) await linear.createBlocksRelation(ids.get(link.blocker)!, ids.get(link.blocked)!);
 			} catch (error) {

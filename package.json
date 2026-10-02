@@ -1,6 +1,6 @@
 {
   "name": "@neverzero/pi-team",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": true,
   "description": "Shared team workflow for Pi: change specs, Linear coordination, checkpoints and independent review",
   "type": "module",
@@ -23,7 +23,6 @@
     "extensions",
     "src",
     "skills",
-    "profiles",
     "templates",
     "review",
     "team.json",

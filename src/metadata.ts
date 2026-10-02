@@ -10,6 +10,7 @@ export interface IssueMetadata {
 	specRepo?: string; // profile name of the repo that owns the spec
 	specCommit?: string;
 	slice?: string;
+	source?: string; // where an issue created by /discover came from, e.g. tasks/T012.md
 	requirements: string[];
 }
 
@@ -21,6 +22,7 @@ export function formatMetadata(meta: IssueMetadata): string {
 		lines.push(`- spec: \`${where}${meta.specCommit ? `@${meta.specCommit.slice(0, 12)}` : ""}\``);
 	}
 	if (meta.slice) lines.push(`- slice: \`${meta.slice}\``);
+	if (meta.source) lines.push(`- source: \`${meta.source}\``);
 	if (meta.requirements.length) lines.push(`- requirements: ${meta.requirements.join(", ")}`);
 	return lines.join("\n");
 }
@@ -35,7 +37,7 @@ function footer(description: string): { start: number; end: number; block: strin
 	let end = at + 1;
 	for (let i = at + 1; i < lines.length; i++) {
 		const line = lines[i].trim();
-		if (/^[-*]\s+(?:repo|spec|slice|requirements):/.test(line)) end = i + 1;
+		if (/^[-*]\s+(?:repo|spec|slice|source|requirements):/.test(line)) end = i + 1;
 		else if (line) break;
 	}
 	// The rule above the heading belongs to the footer too, even with blank lines in between.
@@ -52,6 +54,8 @@ export function parseMetadata(description: string | undefined): IssueMetadata {
 	const value = (key: string) => new RegExp(`^[-*]\\s+${key}:\\s+\`?([^\`\\n]+?)\`?\\s*$`, "m").exec(found.block)?.[1];
 	meta.repo = value("repo");
 	meta.slice = value("slice");
+	const source = value("source");
+	if (source) meta.source = source;
 	const spec = value("spec");
 	if (spec) {
 		const match = /^(?:([\w.-]+):)?([^@]+)(?:@([0-9a-f]+))?$/.exec(spec);

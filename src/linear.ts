@@ -272,6 +272,24 @@ export class LinearClient {
 		return Object.assign(all, { more });
 	}
 
+	async project(name: string): Promise<{ id: string; name: string; url: string } | undefined> {
+		const data = await this.request<{ projects: { nodes: { id: string; name: string; url: string }[] } }>(
+			`query($name: String!) { projects(filter: { name: { eqIgnoreCase: $name } }, first: 5) { nodes { id name url } } }`,
+			{ name },
+		);
+		return data.projects.nodes[0];
+	}
+
+	async createProject(input: { name: string; description: string; teamIds: string[] }): Promise<{ id: string; name: string; url: string }> {
+		const data = await this.request<{ projectCreate: { success: boolean; project: { id: string; name: string; url: string } } }>(
+			`mutation($input: ProjectCreateInput!) { projectCreate(input: $input) { success project { id name url } } }`,
+			{ input },
+			true,
+		);
+		if (!data.projectCreate.success) throw new LinearError("projectCreate reported failure", false, "graphql");
+		return data.projectCreate.project;
+	}
+
 	async createIssue(input: {
 		teamId: string;
 		title: string;

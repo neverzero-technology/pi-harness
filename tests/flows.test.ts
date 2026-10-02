@@ -201,7 +201,7 @@ test("push publishes the owner's issue branch from the host and opens a draft PR
 	await withLinear(async (linear) => {
 		await withGh(async (gh) => {
 			const { root, origin } = profiledRepo();
-			linear.add("ENG-80", { assignee: USERS.dan.id, state: "In Progress", title: "Publishable", description: "1. It works.\n\n---\n**pi-team**\n- repo: `foundations-idp`" });
+			linear.add("ENG-80", { assignee: USERS.dan.id, state: "In Progress", title: "Publishable", description: "1. It works.\n\n---\n**pi-team**\n- repo: `acme-app`" });
 			git(root, "switch", "-qc", "linear/ENG-80-publishable", "--no-track", "origin/main");
 			write(root, "feature.txt", "x\n");
 			git(root, "add", "-A");

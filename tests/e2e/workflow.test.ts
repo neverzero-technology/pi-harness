@@ -5,7 +5,7 @@ import { after, afterEach, before, describe, test } from "node:test";
 import { formatCheckpoint } from "../../src/checkpoint.ts";
 import { loadTeamConfig } from "../../src/config.ts";
 import { USERS } from "../fake-linear.ts";
-import { git, write } from "../helpers.ts";
+import { git, PROFILE, profiledRepo, write } from "../helpers.ts";
 import { type Fixture, fixture } from "./driver.ts";
 
 // Real Pi, real git, fake Linear and fake gh. Run with PI_TEAM_E2E=1 on a machine with Pi installed.
@@ -55,11 +55,11 @@ describe("pi-team under a real Pi host", { skip: !enabled && "set PI_TEAM_E2E=1"
 			`✓ Pi host: ${loadTeamConfig().host.piVersion}`,
 			"✓ Launcher: pi-team",
 			"✓ Sandbox: Gondolin VM ready",
-			"profile foundations-idp",
+			"✓ Profile: acme-app, from origin/main",
 			"✓ Linear identity: Dan <dan@example.test> via LINEAR_API_KEY",
 			"✓ Workflow states: All mapped",
 			"✓ Label: blocked",
-			"✓ Label: repo:foundations-idp",
+			"✓ Label: repo:acme-app",
 			"✓ GitHub CLI",
 			"✓ Other tools: none",
 		]) {
@@ -70,23 +70,23 @@ describe("pi-team under a real Pi host", { skip: !enabled && "set PI_TEAM_E2E=1"
 	});
 
 	test("doctor names what is missing in a misconfigured workspace", async () => {
-		f.linear.labels = ["repo:foundations-idp"];
+		f.linear.labels = ["repo:acme-app"];
 		f.linear.team.key = "OPS";
 		const report = (await f.session().run("/team doctor")).messages.join("\n");
 		f.linear.team.key = "ENG";
-		f.linear.labels = ["blocked", "repo:foundations", "repo:foundations-idp", "repo:migratory"];
+		f.linear.labels = ["blocked", "repo:acme-app", "repo:other-app"];
 		assert.match(report, /✗ Linear team: No team with key ENG/);
 	});
 
 	test("next recommends without claiming", async () => {
 		f.linear.add("ENG-10", { assignee: USERS.dan.id, title: "Mine and ready" });
-		f.linear.add("ENG-11", { labels: ["repo:foundations-idp"], title: "Unassigned here" });
-		f.linear.add("ENG-12", { labels: ["repo:migratory"], title: "Unassigned elsewhere" });
-		f.linear.add("ENG-13", { labels: ["repo:foundations-idp"], title: "Waiting" });
+		f.linear.add("ENG-11", { labels: ["repo:acme-app"], title: "Unassigned here" });
+		f.linear.add("ENG-12", { labels: ["repo:other-app"], title: "Unassigned elsewhere" });
+		f.linear.add("ENG-13", { labels: ["repo:acme-app"], title: "Waiting" });
 		f.linear.blocks("ENG-10", "ENG-13");
 		const out = (await f.session().run("/work next")).messages.join("\n");
 		assert.match(out, /Assigned to you:\n- ENG-10 Mine and ready/);
-		assert.match(out, /Unassigned Ready \(repo:foundations-idp\):\n- ENG-11 Unassigned here/);
+		assert.match(out, /Unassigned Ready \(repo:acme-app\):\n- ENG-11 Unassigned here/);
 		assert.match(out, /Waiting on prerequisites:\n- ENG-13 .*waiting on ENG-10/);
 		assert.doesNotMatch(out, /ENG-12/);
 		assert.equal(f.linear.get("ENG-11").assignee, undefined);
@@ -125,12 +125,12 @@ describe("pi-team under a real Pi host", { skip: !enabled && "set PI_TEAM_E2E=1"
 		const out = messages.join("\n");
 		assert.match(out, /Checkpoint cp-[0-9a-f]{8} stored on ENG-30\. Moved to In Progress\./);
 		assert.match(out, /## Acceptance\nReject conflicting tenant input\./);
-		assert.match(out, /Tenancy \(namespace, repository, RepoSync\) comes from the tenant System entity/);
+		assert.match(out, /Tenancy comes from the tenant record, never from template input/);
 		assert.match(out, /Offline gate: `\.\/scripts\/verify --offline`/);
-		assert.equal(s.status["pi-team"], "foundations-idp · ENG-30 · implement");
+		assert.equal(s.status["pi-team"], "acme-app · ENG-30 · implement");
 
 		const status = (await s.run("/work status")).messages.join("\n");
-		assert.match(status, /Session: ENG-30 · mode implement · profile foundations-idp/);
+		assert.match(status, /Session: ENG-30 · mode implement · profile acme-app/);
 		assert.match(status, /Branch: linear\/ENG-30-tenant-resolution @ [0-9a-f]{12} · branch not pushed/, "a new branch does not count as pushed via origin/main");
 		assert.match(issue.comments[0].body, /\*\*Unsynced local state:\*\* branch not pushed/);
 
@@ -156,11 +156,11 @@ describe("pi-team under a real Pi host", { skip: !enabled && "set PI_TEAM_E2E=1"
 	test("block and unblock keep the workflow state and leave a visible trail", async () => {
 		const s = f.session();
 		await s.run("/work resume ENG-30");
-		await s.run("/work block waiting on the Foundations 0.2 release, token=abc123def456ghi789");
+		await s.run("/work block waiting on the platform 0.2 release, token=abc123def456ghi789");
 		const issue = f.linear.get("ENG-30");
 		assert.deepEqual(issue.labels, ["blocked"]);
 		assert.equal(issue.state, "In Progress");
-		assert.match(issue.comments.at(-1)!.body, /\*\*Blocked\*\* \(pi-team\): waiting on the Foundations 0\.2 release, token=\[redacted\]/);
+		assert.match(issue.comments.at(-1)!.body, /\*\*Blocked\*\* \(pi-team\): waiting on the platform 0\.2 release, token=\[redacted\]/);
 		await s.run("/work block --clear released");
 		assert.deepEqual(issue.labels, []);
 		assert.match(issue.comments.at(-1)!.body, /\*\*Unblocked\*\* \(pi-team\): released/);
@@ -190,7 +190,7 @@ describe("pi-team under a real Pi host", { skip: !enabled && "set PI_TEAM_E2E=1"
 		const inWorktree = f.session(dir);
 		const resumed = (await inWorktree.run("/work resume")).messages.join("\n");
 		assert.match(resumed, /Latest checkpoint cp-[0-9a-f]{8} \(start\) by Dan/);
-		assert.equal(inWorktree.status["pi-team"], "foundations-idp · ENG-40 · implement");
+		assert.equal(inWorktree.status["pi-team"], "acme-app · ENG-40 · implement");
 		git(f.root, "worktree", "remove", "--force", dir);
 		f.linear.get("ENG-40").state = "Canceled";
 	});
@@ -286,9 +286,9 @@ describe("pi-team under a real Pi host", { skip: !enabled && "set PI_TEAM_E2E=1"
 		assert.equal(f.linear.get("ENG-66").state, "In Review");
 		f.linear.get("ENG-66").state = "Done";
 
-		f.linear.add("ENG-67", { assignee: USERS.dan.id, description: "Do it.\n\n---\n**pi-team**\n- repo: `migratory`\n- slice: `x/a`\n- requirements: R1" });
+		f.linear.add("ENG-67", { assignee: USERS.dan.id, description: "Do it.\n\n---\n**pi-team**\n- repo: `other-app`\n- slice: `x/a`\n- requirements: R1" });
 		const wrongRepo = (await f.session().run("/work start ENG-67")).messages.join("\n");
-		assert.match(wrongRepo, /Refused:\n- ENG-67 belongs to migratory, but this checkout is foundations-idp/);
+		assert.match(wrongRepo, /Refused:\n- ENG-67 belongs to other-app, but this checkout is acme-app/);
 		f.linear.get("ENG-67").state = "Done";
 	});
 
@@ -297,7 +297,7 @@ describe("pi-team under a real Pi host", { skip: !enabled && "set PI_TEAM_E2E=1"
 		const s = f.session();
 		const out = (await s.run("/work resume ENG-60")).messages.join("\n");
 		assert.match(out, /Owned by Sam\. This session is read-only assistance \(review mode\)/);
-		assert.equal(s.status["pi-team"], "foundations-idp · ENG-60 · review");
+		assert.equal(s.status["pi-team"], "acme-app · ENG-60 · review");
 	});
 
 	test("finish reports truthfully and only offers the transition the evidence supports", async () => {
@@ -472,6 +472,50 @@ describe("pi-team under a real Pi host", { skip: !enabled && "set PI_TEAM_E2E=1"
 		}
 	});
 
+	test("discover adopts a repository on its own branch and raises the pull request from the host", async () => {
+		const legacy = profiledRepo(null);
+		write(legacy.root, "AGENTS.md", "# App\n\nUse /task-start before working.\n");
+		write(legacy.root, ".claude/commands/task-start.md", "Start a task.\n");
+		write(legacy.root, "tasks/T001.md", "status: todo\nInvoice endpoint\n");
+		git(legacy.root, "add", "-A");
+		git(legacy.root, "commit", "-qm", "legacy");
+		git(legacy.root, "push", "-q", "origin", "main");
+
+		const s = f.session(legacy.root);
+		const doctor = (await s.run("/team doctor")).messages.join("\n");
+		assert.match(doctor, /! Profile: No \.pi-team\/profile\.json: this repository has not adopted the workflow\. Run \/discover\./);
+
+		const scan = await s.prompt("/discover");
+		assert.equal(git(legacy.root, "branch", "--show-current"), "pi-team/adopt");
+		assert.match(scan.messages.join("\n"), /Agent harness configuration \(roles, commands, rules, settings\): \n- \.claude\/commands\/task-start\.md/);
+		assert.match(scan.prompts[0], /skills\/discovery\/SKILL\.md/);
+		assert.match(scan.prompts[0], /Write \.pi-team\/profile\.json in this shape/);
+		assert.match(s.status["pi-team"] ?? "", /discover$/);
+
+		// What the agent would do, done by hand: write the profile, remove the old harness, file the report.
+		write(legacy.root, ".pi-team/profile.json", JSON.stringify({ ...PROFILE, pins: [], consumers: [] }, null, 2));
+		git(legacy.root, "rm", "-q", "-r", ".claude", "tasks");
+		git(legacy.root, "add", "-A");
+		git(legacy.root, "commit", "-qm", "Adopt the workflow");
+		const early = (await s.run("/discover pr")).messages.join("\n");
+		assert.match(early, /not ready\n✗ No adoption report/);
+		assert.match(early, /✗ Deleted without being listed as migrated or removed in the report: \.claude\/commands\/task-start\.md, tasks\/T001\.md/);
+		assert.equal(git(legacy.root, "ls-remote", "--heads", "origin", "pi-team/adopt"), "");
+
+		write(legacy.root, ".git/pi-team/discover.json", JSON.stringify({ report: { summary: "Had Claude task commands and a task ledger.", migrated: [{ from: "tasks/", to: "Linear" }], removed: [{ path: ".claude", reason: "replaced by /work" }], followUps: [] } }));
+		assert.match((await s.run("/discover status")).messages.join("\n"), /ready for \/discover pr/);
+		const raised = await s.run("/discover pr");
+		assert.equal(raised.dialogs[0].title, "Raise the adoption pull request?");
+		assert.match(raised.messages.join("\n"), /Pushed pi-team\/adopt to origin\.\nOpened pull request: https:\/\/github\.example\/pr\/1/);
+		assert.match(git(legacy.root, "ls-remote", "--heads", "origin", "pi-team/adopt"), new RegExp(`^${git(legacy.root, "rev-parse", "HEAD")}`));
+		const args = readFileSync(join(f.ghDir, "pr-create.args"), "utf8");
+		assert.match(args, /pr create --head pi-team\/adopt --base main --title Adopt the pi-team workflow --body Adopts the pi-team workflow for `acme-app`\./);
+
+		// The profile now applies on this branch, and doctor says it is not merged yet.
+		const after = (await f.session(legacy.root).run("/team doctor")).messages.join("\n");
+		assert.match(after, /! Profile: acme-app, from the working tree; it takes effect for everyone once merged to origin\/main/);
+	});
+
 	test("spec commands hand the method to the model in the right mode", async () => {
 		write(f.root, "docs/changes/x.md", "---\nid: x\nlinear: ENG-30\n---\n# X\n## Requirements\n### R1 — A\nText\n");
 		const s = f.session();
@@ -481,15 +525,15 @@ describe("pi-team under a real Pi host", { skip: !enabled && "set PI_TEAM_E2E=1"
 		const plan = (await s.run("/spec plan docs/changes/x.md")).messages.join("\n");
 		assert.match(plan, /Cannot plan until lint errors and blocking questions are resolved/);
 
-		const draft = await s.run("/spec draft ENG-30");
+		const draft = await s.prompt("/spec draft ENG-30");
 		assert.match(draft.prompts[0], /specification\/SKILL\.md/);
 		assert.match(draft.prompts[0], /Source: Linear issue ENG-30/);
-		assert.equal(s.status["pi-team"], "foundations-idp · no issue · spec");
+		assert.equal(s.status["pi-team"], "acme-app · no issue · spec");
 
-		const align = await s.run("/align docs/changes/x.md");
-		assert.match(align.prompts[0], /This repo consumes foundations 0\.1\.0-alpha\.1 \(tag v0\.1\.0-alpha\.1, commit 3517dd4818a7\)/);
+		const align = await s.prompt("/align docs/changes/x.md");
+		assert.match(align.prompts[0], /This repo consumes platform 0\.1\.0-alpha\.1 \(tag v0\.1\.0-alpha\.1, commit 3517dd4818a7\)/);
 		assert.match(align.prompts[0], /FAIL {2}docs\/changes\/x\.md/);
-		assert.equal(s.status["pi-team"], "foundations-idp · no issue · review");
+		assert.equal(s.status["pi-team"], "acme-app · no issue · review");
 		writeFileSync(join(f.root, "docs/changes/x.md"), "");
 	});
 });

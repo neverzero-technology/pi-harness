@@ -1,4 +1,5 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { registerDiscover } from "../src/commands/discover.ts";
 import { registerReview } from "../src/commands/review.ts";
 import { registerSpec } from "../src/commands/spec.ts";
 import { registerTeamCommand } from "../src/commands/team.ts";
@@ -21,6 +22,7 @@ export function registerTeam(pi: ExtensionAPI, sandboxOptions?: SandboxOptions):
 	registerWork(team);
 	registerSpec(team);
 	registerReview(team);
+	registerDiscover(team);
 	registerTeamCommand(team);
 
 	pi.on("session_start", async (_event, ctx) => {
@@ -32,6 +34,10 @@ export function registerTeam(pi: ExtensionAPI, sandboxOptions?: SandboxOptions):
 			if (issue) team.state = { ...team.state, issue };
 		}
 		team.showStatus(ctx);
+		if (repo && ctx.hasUI) {
+			if (repo.profileState.errors.length) ctx.ui.notify(`The repository profile is invalid (${repo.profileState.errors[0]}); /team doctor has the details.`, "warning");
+			else if (!repo.profile) ctx.ui.notify("This repository has not adopted the workflow yet (no .pi-team/profile.json). Run /discover.", "info");
+		}
 		const pending = repo?.pending.list() ?? [];
 		if (pending.length && ctx.hasUI) {
 			ctx.ui.notify(

@@ -71,6 +71,15 @@ export class PiSession {
 
 	// With `untilSettled`, waits for the model to finish the work the command started.
 	run(message: string, answer: Answer = () => true, timeoutMs = 60_000, untilSettled = false): Promise<RunResult> {
+		return this.runUntil(message, () => true, answer, timeoutMs, untilSettled);
+	}
+
+	// For a command that hands a prompt to the model: the prompt event can trail the command's response.
+	prompt(message: string, answer: Answer = () => true): Promise<RunResult> {
+		return this.runUntil(message, (result) => result.prompts.length > 0, answer, 60_000, false);
+	}
+
+	private runUntil(message: string, done: (result: RunResult) => boolean, answer: Answer, timeoutMs: number, untilSettled: boolean): Promise<RunResult> {
 		const id = `req-${++this.seq}`;
 		const result: RunResult = { messages: [], prompts: [], notices: [], dialogs: [], status: this.status, modelTurns: 0, assistant: [], tools: [] };
 		return new Promise((resolve, reject) => {
@@ -130,7 +139,7 @@ export class PiSession {
 				}
 				// Messages can trail the response by a tick; settle once the stream goes quiet.
 				// With `untilSettled`, a command that starts no model turn within a few seconds is complete too.
-				if (handled && !(untilSettled && result.modelTurns > 0)) {
+				if (handled && done(result) && !(untilSettled && result.modelTurns > 0)) {
 					clearTimeout(settle);
 					settle = setTimeout(finish, untilSettled ? 3000 : 400);
 				} else {
@@ -175,11 +184,11 @@ export interface Fixture {
 	close(): Promise<void>;
 }
 
-// A repository whose configured origin names the real IDP repo (so the profile resolves) while git
-// traffic is rewritten to a local bare repository, a fake `gh`, and a fake Linear over HTTP.
+// A repository that has adopted the workflow (its profile is merged on a local origin), a fake `gh`,
+// and a fake Linear over HTTP.
 export async function fixture(): Promise<Fixture> {
 	const { root } = profiledRepo();
-	write(root, "foundations-release/release.lock.yaml", "release:\n  version: 0.1.0-alpha.1\n  tag: v0.1.0-alpha.1\n  commit: 3517dd4818a7\n");
+	write(root, "release.lock.yaml", "release:\n  version: 0.1.0-alpha.1\n  tag: v0.1.0-alpha.1\n  commit: 3517dd4818a7\n");
 	git(root, "add", "-A");
 	git(root, "commit", "-qm", "release pin");
 	git(root, "push", "-q", "origin", "main");

@@ -70,20 +70,30 @@ export function repoWithOrigin(): { root: string; origin: string } {
 	return { root, origin };
 }
 
-// A repo whose configured origin names a real team repository (so its profile resolves) while git
-// traffic is rewritten to a local bare repository.
-export function profiledRepo(name = "foundations-idp"): { root: string; origin: string } {
+// The profile a test repository carries: what any adopted repository holds in .pi-team/profile.json.
+export const PROFILE = {
+	name: "acme-app",
+	docs: ["AGENTS.md", "PLAN.md"],
+	verify: { offline: "./scripts/verify --offline", full: "./scripts/verify", notes: ["The full gate needs Docker; its results are local evidence, not live."] },
+	generated: ["templates/generated/**", "api/gen/*client*"],
+	invariants: ["Tenancy comes from the tenant record, never from template input.", "Never hand-edit generated output; change the generator and regenerate."],
+	pins: [{ file: "release.lock.yaml", producer: "platform" }],
+	consumers: ["portal"],
+	linear: { label: "repo:acme-app" },
+};
+
+// A repository that has adopted the workflow: its profile is merged on the default branch of a local origin.
+export function profiledRepo(profile: object | null = PROFILE): { root: string; origin: string } {
 	const origin = tempDir("pi-team-origin-");
 	git(origin, "init", "-q", "--bare", "-b", "main");
 	const root = tempDir("pi-team-repo-");
-	const url = `https://github.com/neverzero-technology/${name}.git`;
 	git(root, "init", "-q", "-b", "main");
-	git(root, "remote", "add", "origin", url);
-	git(root, "config", `url.${origin}.insteadOf`, url);
+	git(root, "remote", "add", "origin", origin);
 	git(root, "config", "user.name", "Dan");
 	git(root, "config", "user.email", "dan@example.test");
 	write(root, "README.md", "fixture\n");
 	write(root, "PLAN.md", "# plan\n");
+	if (profile) write(root, ".pi-team/profile.json", `${JSON.stringify(profile, null, 2)}\n`);
 	git(root, "add", "-A");
 	git(root, "commit", "-qm", "init");
 	git(root, "push", "-q", "-u", "origin", "main");

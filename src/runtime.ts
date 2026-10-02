@@ -4,8 +4,9 @@ import { join } from "node:path";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import type { Checkpoint } from "./checkpoint.ts";
 import { containsCheckpoint, formatCheckpoint, newCheckpointId } from "./checkpoint.ts";
-import type { LogicalState, Profile, TeamConfig } from "./config.ts";
-import { loadProfiles, loadTeamConfig, PACKAGE_ROOT, profileForOrigin } from "./config.ts";
+import type { LogicalState, TeamConfig } from "./config.ts";
+import { loadTeamConfig, PACKAGE_ROOT } from "./config.ts";
+import { type LoadedProfile, loadProfile, type Profile } from "./profile.ts";
 import { branchIssue, Git, GitHub, type WorkingState } from "./git.ts";
 import type { Issue, WorkflowState } from "./linear.ts";
 import { LinearClient, LinearError } from "./linear.ts";
@@ -13,6 +14,7 @@ import { parseMetadata } from "./metadata.ts";
 import type { Mode } from "./modes.ts";
 import type { SandboxHandle } from "./sandbox.ts";
 import { PendingStore, ReviewStore } from "./pending.ts";
+import { DiscoverStore } from "./discover.ts";
 
 export const STATE_ENTRY = "pi-team-state";
 export const MESSAGE_TYPE = "pi-team";
@@ -27,10 +29,13 @@ export interface RepoContext {
 	gh: GitHub;
 	root: string;
 	origin: string | undefined;
+	// The repository's own .pi-team/profile.json; undefined until the repository has adopted the workflow.
 	profile: Profile | undefined;
+	profileState: LoadedProfile;
 	defaultRef: string;
 	pending: PendingStore;
 	reviews: ReviewStore;
+	discover: DiscoverStore;
 }
 
 export class TeamError extends Error {}
@@ -44,7 +49,6 @@ export interface Viewer {
 export class Team {
 	sandbox: SandboxHandle | undefined;
 	readonly config: TeamConfig;
-	readonly profiles: Profile[];
 	state: SessionState = { mode: "implement" };
 	repo: RepoContext | undefined;
 	// HEAD at the last checkpoint this session stored; used to warn before context is compacted.
@@ -60,7 +64,6 @@ export class Team {
 	constructor(pi: ExtensionAPI) {
 		this.pi = pi;
 		this.config = loadTeamConfig();
-		this.profiles = loadProfiles();
 	}
 
 	resource(...parts: string[]): string {
@@ -76,19 +79,23 @@ export class Team {
 			this.repo = undefined;
 			return undefined;
 		}
-		const origins = await git.origins();
-		const origin = origins[0];
-		const profile = origins.map((o) => profileForOrigin(this.profiles, o)).find(Boolean);
+		const rootGit = new Git(exec, root);
+		const origin = await rootGit.origin();
+		const detected = `origin/${await rootGit.defaultBranch()}`;
+		const profileState = await loadProfile(rootGit, root, detected);
+		const profile = profileState.profile;
 		const commonDir = (await git.commonDir()) ?? join(root, ".git");
 		this.repo = {
-			git: new Git(exec, root),
+			git: rootGit,
 			gh: new GitHub(exec, root),
 			root,
 			origin,
 			profile,
-			defaultRef: `origin/${profile?.defaultBranch ?? "main"}`,
+			profileState,
+			defaultRef: profile?.defaultBranch ? `origin/${profile.defaultBranch}` : detected,
 			pending: new PendingStore(commonDir),
 			reviews: new ReviewStore(commonDir),
+			discover: new DiscoverStore(commonDir),
 		};
 		return this.repo;
 	}

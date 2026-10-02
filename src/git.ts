@@ -97,10 +97,22 @@ export class Git {
 	}
 
 
-	// The configured URL, then the URL after any insteadOf rewriting: either may be the one a profile names.
-	async origins(): Promise<string[]> {
-		const urls = await Promise.all([this.run(["config", "--get", "remote.origin.url"]), this.run(["remote", "get-url", "origin"])]);
-		return [...new Set(urls.filter((u): u is string => Boolean(u)))];
+	origin(): Promise<string | undefined> {
+		return this.run(["config", "--get", "remote.origin.url"]);
+	}
+
+	// origin's default branch: what origin/HEAD points at, else whichever of main or master exists there.
+	async defaultBranch(): Promise<string> {
+		const head = await this.run(["symbolic-ref", "--quiet", "--short", "refs/remotes/origin/HEAD"]);
+		if (head?.startsWith("origin/")) return head.slice("origin/".length);
+		for (const name of ["main", "master"]) {
+			if (await this.ok(["rev-parse", "--verify", "--quiet", `refs/remotes/origin/${name}`])) return name;
+		}
+		return "main";
+	}
+
+	trackedFiles(): Promise<string[]> {
+		return this.run(["ls-files"], 60_000).then((out) => (out ? out.split("\n").filter(Boolean) : []));
 	}
 
 	async state(): Promise<WorkingState | undefined> {
@@ -179,6 +191,11 @@ export class Git {
 		return out ? out.split("\n").filter(Boolean) : [];
 	}
 
+	// Files added, changed, renamed or deleted on this branch since it left `base`.
+	async nameStatus(base: string): Promise<string> {
+		return (await this.run(["diff", "--name-status", "-M", `${base}...HEAD`], 60_000)) ?? "";
+	}
+
 	show(ref: string, path: string): Promise<string | undefined> {
 		return this.run(["show", `${ref}:${path}`]);
 	}
@@ -249,10 +266,10 @@ export class GitHub {
 		return result.code === 0 ? (JSON.parse(result.stdout) as PullRequest) : undefined;
 	}
 
-	async createDraftPr(options: { head: string; base: string; title: string; body: string }): Promise<{ url?: string; error?: string }> {
+	async createPr(options: { head: string; base: string; title: string; body: string; draft: boolean }): Promise<{ url?: string; error?: string }> {
 		const result = await this.exec(
 			"gh",
-			["pr", "create", "--draft", "--head", options.head, "--base", options.base, "--title", options.title, "--body", options.body],
+			["pr", "create", ...(options.draft ? ["--draft"] : []), "--head", options.head, "--base", options.base, "--title", options.title, "--body", options.body],
 			{ cwd: this.cwd, timeout: 60_000 },
 		);
 		if (result.code !== 0) return { error: result.stderr.trim().split("\n")[0] || `gh exited ${result.code}` };

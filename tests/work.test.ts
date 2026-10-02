@@ -301,7 +301,7 @@ const slice = (key: string, patch: Partial<ProposedSlice> = {}): ProposedSlice =
 	title: key,
 	acceptance: "a",
 	requirements: ["R1"],
-	repo: "foundations",
+	repo: "acme-app",
 	surfaces: [],
 	verification: "v",
 	dependsOn: [],

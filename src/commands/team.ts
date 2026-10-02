@@ -1,7 +1,6 @@
-import { existsSync } from "node:fs";
-import { join } from "node:path";
 import type { ExtensionCommandContext } from "@earendil-works/pi-coding-agent";
 import { PACKAGE_ROOT, readPackageVersion } from "../config.ts";
+import { PROFILE_PATH } from "../profile.ts";
 import type { IssueRef } from "../linear.ts";
 import { MODES, type Mode } from "../modes.ts";
 import { errorText, type Team, TeamError } from "../runtime.ts";
@@ -87,9 +86,12 @@ async function doctor(team: Team, ctx: ExtensionCommandContext): Promise<void> {
 	const repo = await team.loadRepo(ctx.cwd);
 	if (!repo) add("warn", "Repository", "Not inside a git repository");
 	else {
-		add(repo.profile ? "ok" : "warn", "Repository", `${repo.root} · ${repo.origin ?? "no origin"} · profile ${repo.profile?.name ?? "none"}`);
-		const legacy = (repo.profile?.legacy ?? []).filter((p) => existsSync(join(repo.root, p)));
-		if (legacy.length) add("warn", "Legacy harness", `${legacy.join(", ")}: not loaded here, but retire any competing progress writer`);
+		add("ok", "Repository", `${repo.root} · ${repo.origin ?? "no origin"} · default branch ${repo.defaultRef}`);
+		const state = repo.profileState;
+		if (state.errors.length) add("fail", "Profile", `${PROFILE_PATH} (${state.source}) is invalid: ${state.errors.join("; ")}`);
+		else if (!repo.profile) add("warn", "Profile", `No ${PROFILE_PATH}: this repository has not adopted the workflow. Run /discover.`);
+		else if (state.source === "working-tree") add("warn", "Profile", `${repo.profile.name}, from the working tree; it takes effect for everyone once merged to ${repo.defaultRef}`);
+		else add(state.unmerged ? "warn" : "ok", "Profile", `${repo.profile.name}, from ${repo.defaultRef}${state.unmerged ? "; the working tree has unmerged profile changes, which are not in force" : ""}`);
 		const pending = repo.pending.list();
 		add(pending.length ? "warn" : "ok", "Pending checkpoints", pending.length ? pending.map((p) => `${p.issue} ${p.id}`).join(", ") : "none");
 	}
@@ -107,7 +109,7 @@ async function doctor(team: Team, ctx: ExtensionCommandContext): Promise<void> {
 				const states = await linear.workflowStates(linearTeam.key);
 				const missing = Object.entries(config.linear.states).filter(([, name]) => !states.some((s) => s.name.toLowerCase() === name.toLowerCase()));
 				add(missing.length ? "fail" : "ok", "Workflow states", missing.length ? `Missing: ${missing.map(([k, n]) => `${k}="${n}"`).join(", ")}` : "All mapped");
-				const labels = [config.linear.blockedLabel, ...(repo?.profile ? [repo.profile.linearLabel] : [])];
+				const labels = [config.linear.blockedLabel, ...(repo?.profile ? [repo.profile.linear.label] : [])];
 				for (const label of labels) {
 					const id = await linear.labelId(label, linearTeam.id);
 					add(id ? "ok" : "warn", "Label", `${label}${id ? "" : " not found"}`);

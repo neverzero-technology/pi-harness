@@ -8,7 +8,7 @@ const base: GuardInput = {
 	input: { path: "src/a.ts" },
 	cwd: "/repo",
 	repoRoot: "/repo",
-	generated: ["templates/generated/**", "platform/kcc/*operator*"],
+	generated: ["templates/generated/**", "api/gen/*client*"],
 	specDirs: ["docs"],
 };
 const run = (patch: Partial<GuardInput>) => guardToolCall({ ...base, ...patch });
@@ -22,8 +22,8 @@ test("implement mode allows ordinary edits", () => {
 test("generated output is blocked in every mode", () => {
 	const decision = run({ input: { path: "templates/generated/x/y.yaml" } });
 	assert.equal(decision.action, "block");
-	assert.equal(run({ input: { path: "/repo/platform/kcc/config-operator.yaml" } }).action, "block");
-	assert.equal(run({ input: { path: "platform/kcc/other.yaml" } }).action, "allow");
+	assert.equal(run({ input: { path: "/repo/api/gen/http-client.ts" } }).action, "block");
+	assert.equal(run({ input: { path: "api/gen/notes.md" } }).action, "allow");
 });
 
 test("spec mode only edits docs", () => {

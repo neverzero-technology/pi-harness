@@ -3,7 +3,7 @@ import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
 import type { CheckResult } from "./checkpoint.ts";
-import type { Profile } from "./config.ts";
+import type { Profile } from "./profile.ts";
 import { PACKAGE_ROOT } from "./config.ts";
 
 // The reviewer is a fresh Pi with a read-only Gondolin VM and no team/Linear tools.

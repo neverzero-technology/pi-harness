@@ -35,7 +35,6 @@ const DEFAULT_GREP_LIMIT = 100;
 
 export const SANDBOX_TOOLS = ["read", "write", "edit", "bash", "grep", "find", "ls"];
 export const READ_ONLY_TOOLS = ["read", "grep", "find", "ls"];
-const TEAM_TOOLS = ["team_issue_read", "team_issue_search", "team_spec_lint", "team_checkpoint", "team_plan_slices"];
 
 export interface SandboxOptions {
 	readOnly?: boolean;
@@ -58,7 +57,7 @@ export function registerSandbox(pi: ExtensionAPI, options: SandboxOptions = {}):
 	let shellPath = "/bin/sh";
 	let stopping = false;
 	let closing: Promise<void> | undefined;
-	const allowed = new Set(options.readOnly ? READ_ONLY_TOOLS : [...SANDBOX_TOOLS, ...TEAM_TOOLS, "codemode", "tool_search"]);
+	const allowed = new Set(options.readOnly ? READ_ONLY_TOOLS : [...SANDBOX_TOOLS, "codemode", "tool_search"]);
 
 	async function startVm(): Promise<VM> {
 		const { VM, RealFSProvider, ReadonlyProvider } = await import("@earendil-works/gondolin");
@@ -76,7 +75,7 @@ export function registerSandbox(pi: ExtensionAPI, options: SandboxOptions = {}):
 				mounts[commonPath] = mounts[common];
 			}
 		} catch { /* A non-Git workspace needs no additional mount. */ }
-		for (const dir of ["skills", "templates", "review", "profiles"]) {
+		for (const dir of ["skills", "templates", "review"]) {
 			const resource = path.resolve(PACKAGE_ROOT, dir);
 			mounts[resource] = new ReadonlyProvider(new RealFSProvider(resource));
 		}
@@ -159,7 +158,9 @@ export function registerSandbox(pi: ExtensionAPI, options: SandboxOptions = {}):
 		await active?.close();
 	});
 	pi.on("tool_call", async (event, ctx) => {
-		if (!allowed.has(event.toolName)) return { block: true, reason: `${event.toolName} is outside the harness sandbox tool policy` };
+		// The harness's own team_* tools run on the host by design; the reviewer gets none of them.
+		const teamTool = !options.readOnly && event.toolName.startsWith("team_");
+		if (!allowed.has(event.toolName) && !teamTool) return { block: true, reason: `${event.toolName} is outside the harness sandbox tool policy` };
 		await ensureVm(ctx);
 	});
 	pi.on("user_bash", async (_event, ctx) => {
