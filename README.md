@@ -76,7 +76,7 @@ Authentication is individual. Never share `auth.json`, keys or tokens.
 | `/review [issue]` | Fresh `pi` process with a read-only Gondolin workspace and `read`/`grep`/`find`/`ls` only reviews the diff against acceptance and constraints | Verdict and commit recorded per issue in `.git/pi-team/reviews/` only when the tree was clean; flags open PRs touching the same files |
 | `/work push` | Pushes the issue branch to origin from the host and opens a draft PR if none is open | Owner only; issue branch only, never the default branch; confirmed first; never forced; uncommitted files are left out |
 | `/work finish [issue]` | Reports each completion condition, has the agent assess acceptance into a final checkpoint, then offers In Review or Done | See "What finish checks" below; every transition needs the human's confirmation |
-| `/discover` then `/discover linear`, `status`, `pr` | Adopts the workflow in an existing repository; see "Adopting a repository" | Own branch from a clean checkout; discover mode edits only workflow configuration and documents; every deleted file must be accounted for; Linear writes are previewed and confirmed; the PR is raised from the host |
+| `/discover` then `/discover linear`, `status`, `pr` | Adopts the workflow in an existing repository; see "Adopting a repository" | Own branch from the default branch, in a separate worktree when the checkout has work in progress; discover mode edits only workflow configuration and documents; every deleted file must be accounted for; Linear writes are previewed and confirmed; the PR is raised from the host |
 | `/team doctor` / `setup` / `version` / `status` / `mode <implement\|spec\|review>` | Setup check, sign-in steps, versions, team-wide view of active, in-review and Ready work, and manual mode switch | |
 
 The agent-facing tools are:
@@ -167,7 +167,7 @@ The package ships no repository profiles. A change to `team.json` is a package r
 
 Run `pi-team` in the repository and use `/discover`. It works for a repository with no agent setup at all, and for one that already has another harness, its own specification format, PRDs or a task ledger.
 
-1. **`/discover`** switches to a `pi-team/adopt` branch from a clean checkout of the default branch and lists what it found by name: agent instruction files, harness configuration (`.claude/`, `.codex/`, `.cursor/`, Spec Kit, Kiro, OpenSpec and similar), specifications and plans, task ledgers, verification entry points, CI and hooks. The agent then, following the discovery skill:
+1. **`/discover`** works on a `pi-team/adopt` branch created from the default branch. If your checkout has uncommitted or untracked files, it leaves them alone and offers to create a separate worktree for the adoption instead; you then start `pi-team` in that worktree and run `/discover` again. It lists what it found by name: agent instruction files, harness configuration (`.claude/`, `.codex/`, `.cursor/`, Spec Kit, Kiro, OpenSpec and similar), specifications and plans, task ledgers, verification entry points, CI and hooks. The agent then, following the discovery skill:
    - writes `.pi-team/profile.json` from the repository's own documents and scripts;
    - converts unfinished PRDs, plans and proposals into change specifications under `docs/changes/`, and leaves authoritative architecture documents where they are;
    - reduces `AGENTS.md` to what the profile does not hold, and deletes old harness configuration and task ledgers;

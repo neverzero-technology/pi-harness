@@ -156,12 +156,6 @@ test("/discover starts the adoption on its own branch with the inventory and the
 		const { h, discover, report } = await session(root);
 		assert.match(h.notices.join("\n"), /has not adopted the workflow yet .* Run \/discover/);
 
-		write(root, "wip.txt", "x");
-		await discover();
-		assert.match(h.notices.at(-1)!, /Commit or stash your changes first/);
-		assert.equal(git(root, "branch", "--show-current"), "main");
-		git(root, "clean", "-qf");
-
 		await discover();
 		assert.equal(git(root, "branch", "--show-current"), ADOPT_BRANCH);
 		assert.equal(git(root, "config", "--get", "--default", "none", `branch.${ADOPT_BRANCH}.merge`), "none", "the adoption branch does not track main");
@@ -180,6 +174,57 @@ test("/discover starts the adoption on its own branch with the inventory and the
 		write(root, PROFILE_PATH, "{}");
 		await discover();
 		assert.equal(git(root, "branch", "--show-current"), ADOPT_BRANCH);
+	});
+});
+
+test("a checkout with work in progress is left alone: the adoption goes to its own worktree", async () => {
+	await withLinear(async () => {
+		const { root } = legacyRepo();
+		write(root, "wip.txt", "someone's untracked notes\n");
+		write(root, "Makefile", "verify:\n\tfalse\n");
+		const { h, discover, report } = await session(root);
+
+		// Declining changes nothing.
+		h.answers.select = () => "Cancel";
+		await discover();
+		assert.match(h.selects[0].title, /This checkout has 2 uncommitted file\(s\) \(Makefile, wip\.txt\), which will be left untouched\. Do the adoption in:/);
+		assert.equal(h.selects[0].options.length, 2);
+		assert.match(h.notices.at(-1)!, /Nothing was changed/);
+		assert.equal(git(root, "branch", "--list", ADOPT_BRANCH), "");
+
+		// Accepting creates the worktree from the default branch and leaves this checkout exactly as it was.
+		h.answers.select = (options) => options[0];
+		await discover();
+		const dir = h.selects[1].options[0].replace("A new worktree at ", "");
+		assert.match(report(), /Created worktree .*pi-team-adopt on pi-team\/adopt, from origin\/main\. This checkout is untouched\.\nContinue there: cd .* && pi-team, then \/discover/);
+		assert.equal(git(root, "branch", "--show-current"), "main");
+		assert.equal(git(root, "status", "--porcelain"), "M Makefile\n?? wip.txt");
+		assert.equal(git(dir, "branch", "--show-current"), ADOPT_BRANCH);
+		assert.equal(git(dir, "status", "--porcelain"), "", "the worktree starts clean, without the work in progress");
+		assert.equal(h.userMessages.length, 0, "the scan itself runs in the worktree session");
+		assert.match(h.status.get("pi-team")!, /implement$/);
+
+		// Asking again from here points at the worktree instead of making another.
+		await discover();
+		assert.equal(h.selects.length, 2);
+		assert.match(report(), /The adoption is already under way on pi-team\/adopt in .*pi-team-adopt\.\nContinue there:/);
+
+		// In the worktree, /discover goes straight to the scan.
+		const there = await session(dir);
+		await there.discover();
+		assert.equal(there.h.selects.length, 0);
+		assert.match(there.h.userMessages.at(-1)!, /skills\/discovery\/SKILL\.md/);
+		assert.match(there.h.status.get("pi-team")!, /discover$/);
+		assert.match(there.report(), /Task and progress ledgers: \n- tasks\/T001\.md/);
+
+		// Without a UI nothing is created; the message says what to do.
+		const other = legacyRepo();
+		write(other.root, "wip.txt", "x");
+		const headless = await session(other.root);
+		headless.h.ctx.hasUI = false;
+		await headless.discover();
+		assert.match(headless.h.notices.at(-1)!, /1 uncommitted file\(s\) \(wip\.txt\), which will be left untouched\. Run \/discover in an interactive session/);
+		assert.equal(git(other.root, "worktree", "list").split("\n").length, 1);
 	});
 });
 

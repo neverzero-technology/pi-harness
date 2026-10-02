@@ -516,6 +516,30 @@ describe("pi-team under a real Pi host", { skip: !enabled && "set PI_TEAM_E2E=1"
 		assert.match(after, /! Profile: acme-app, from the working tree; it takes effect for everyone once merged to origin\/main/);
 	});
 
+	test("discover leaves work in progress alone and uses a worktree", async () => {
+		const legacy = profiledRepo(null);
+		write(legacy.root, "notes.txt", "untracked work in progress\n");
+		const s = f.session(legacy.root);
+		const cancelled = await s.run("/discover", () => "Cancel");
+		assert.match(cancelled.dialogs[0].title, /This checkout has 1 uncommitted file\(s\) \(notes\.txt\), which will be left untouched\. Do the adoption in:/);
+		assert.match(cancelled.notices.join("\n"), /Nothing was changed/);
+
+		const created = await s.run("/discover", (d) => d.options![0]);
+		const dir = created.dialogs[0].options![0].replace("A new worktree at ", "");
+		assert.match(created.messages.join("\n"), /Created worktree .* on pi-team\/adopt, from origin\/main\. This checkout is untouched\./);
+		assert.equal(created.prompts.length, 0);
+		assert.equal(git(legacy.root, "branch", "--show-current"), "main");
+		assert.equal(git(legacy.root, "status", "--porcelain"), "?? notes.txt");
+
+		// The session started in the worktree carries on with the scan.
+		const there = f.session(dir);
+		const scan = await there.prompt("/discover");
+		assert.equal(scan.dialogs.length, 0);
+		assert.match(scan.prompts[0], /skills\/discovery\/SKILL\.md/);
+		assert.match(there.status["pi-team"] ?? "", /discover$/);
+		git(legacy.root, "worktree", "remove", "--force", dir);
+	});
+
 	test("spec commands hand the method to the model in the right mode", async () => {
 		write(f.root, "docs/changes/x.md", "---\nid: x\nlinear: ENG-30\n---\n# X\n## Requirements\n### R1 — A\nText\n");
 		const s = f.session();

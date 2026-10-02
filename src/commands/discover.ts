@@ -1,3 +1,4 @@
+import { basename, resolve } from "node:path";
 import type { ExtensionCommandContext } from "@earendil-works/pi-coding-agent";
 import { Type, type TSchema } from "typebox";
 import { redactSecrets } from "../checkpoint.ts";
@@ -49,9 +50,31 @@ async function scan(team: Team, ctx: ExtensionCommandContext): Promise<void> {
 	const git = await repo.git.state();
 	if (!git) throw new TeamError("Not inside a git repository");
 	if (git.branch !== ADOPT_BRANCH) {
-		// The adoption is one reviewable change, so it starts from a clean copy of the default branch.
-		if (git.changed.length + git.untracked.length) throw new TeamError("Commit or stash your changes first; /discover works on its own branch from a clean checkout");
+		const elsewhere = await repo.git.worktreeFor(ADOPT_BRANCH);
+		if (elsewhere) {
+			team.report(`The adoption is already under way on ${ADOPT_BRANCH} in ${elsewhere}.\nContinue there: cd ${elsewhere} && pi-team, then /discover`);
+			return;
+		}
 		const exists = await repo.git.ok(["rev-parse", "--verify", "--quiet", `refs/heads/${ADOPT_BRANCH}`]);
+		const dirty = [...git.changed, ...git.untracked];
+		if (dirty.length) {
+			// The adoption is one reviewable change from the default branch, and work in progress here is not part
+			// of it. So it happens in its own worktree, and this checkout is left exactly as it is.
+			const dir = resolve(repo.root, team.config.git.worktreeDir.replace("{repo}", basename(repo.root)), ADOPT_BRANCH.replace(/\//g, "-"));
+			const explain = `This checkout has ${dirty.length} uncommitted file(s) (${dirty.slice(0, 3).join(", ")}${dirty.length > 3 ? ", …" : ""}), which will be left untouched.`;
+			if (!ctx.hasUI) throw new TeamError(`${explain} Run /discover in an interactive session to do the adoption in a separate worktree, or commit or stash first.`);
+			const worktree = `A new worktree at ${dir}`;
+			const choice = await ctx.ui.select(`${explain} Do the adoption in:`, [worktree, "Cancel"]);
+			if (choice !== worktree) {
+				ctx.ui.notify("Nothing was changed", "info");
+				return;
+			}
+			const added = await repo.git.addWorktree(dir, ADOPT_BRANCH, repo.defaultRef, exists);
+			if (added.code !== 0) throw new TeamError(`git worktree add failed: ${added.stderr.trim()}`);
+			// A session cannot change its working directory, so the adoption continues in a session started there.
+			team.report(`Created worktree ${dir} on ${ADOPT_BRANCH}, from ${repo.defaultRef}. This checkout is untouched.\nContinue there: cd ${dir} && pi-team, then /discover`);
+			return;
+		}
 		const switched = await repo.git.switchTo(ADOPT_BRANCH, repo.defaultRef, exists);
 		if (switched.code !== 0) throw new TeamError(`Could not switch to ${ADOPT_BRANCH}: ${switched.stderr.trim()}`);
 	}
