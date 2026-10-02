@@ -48,9 +48,14 @@ if (resourceFlag) {
 	console.error(`pi-team: ${resourceFlag} is not allowed; the harness enforces its bundled Gondolin sandbox and resources.`);
 	process.exit(1);
 }
+// Since Pi 1.0, --provider only narrows where --model is looked up, and Pi rejects it on its own.
+if (flags.includes("--provider") && !flags.includes("--model")) {
+	console.error(`pi-team: --provider needs --model. Omit both to use the team model (${team.model.id}).`);
+	process.exit(1);
+}
 const args = [
 	...launchArgs({
-		hasModel: flags.includes("--model") || flags.includes("--provider"),
+		hasModel: flags.includes("--model"),
 		hasThinking: flags.includes("--thinking"),
 	}),
 	...passthrough,

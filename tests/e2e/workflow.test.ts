@@ -3,6 +3,7 @@ import { chmodSync, existsSync, readdirSync, readFileSync, writeFileSync } from 
 import { join } from "node:path";
 import { after, afterEach, before, describe, test } from "node:test";
 import { formatCheckpoint } from "../../src/checkpoint.ts";
+import { loadTeamConfig } from "../../src/config.ts";
 import { USERS } from "../fake-linear.ts";
 import { git, write } from "../helpers.ts";
 import { type Fixture, fixture } from "./driver.ts";
@@ -51,7 +52,7 @@ describe("pi-team under a real Pi host", { skip: !enabled && "set PI_TEAM_E2E=1"
 		const report = messages.join("\n");
 		for (const expected of [
 			"✓ Package: @neverzero/pi-team",
-			"✓ Pi host: 0.99.2",
+			`✓ Pi host: ${loadTeamConfig().host.piVersion}`,
 			"✓ Launcher: pi-team",
 			"✓ Sandbox: Gondolin VM ready",
 			"profile foundations-idp",

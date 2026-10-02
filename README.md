@@ -22,7 +22,7 @@ One Pi package that gives the team the same lightweight process across Foundatio
 
 You need:
 
-- **Node.js 24 or newer**, Pi **0.99.2** (the tested host), and npm;
+- **Node.js 24 or newer**, Pi **1.0.0** (the tested host), and npm;
 - **QEMU** on macOS or Linux, on ARM64 or x86-64;
 - Git, the GitHub CLI signed in, and your own Codex and Linear credentials.
 

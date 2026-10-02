@@ -1,6 +1,6 @@
 {
   "host": {
-    "piVersion": "0.99.2"
+    "piVersion": "1.0.0"
   },
   "model": {
     "id": "openai-codex/gpt-5.5",
