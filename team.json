@@ -3,7 +3,7 @@
     "piVersion": "1.0.0"
   },
   "model": {
-    "id": "openai-codex/gpt-5.5",
+    "id": "openai-codex/gpt-6.1-sol",
     "thinking": "medium",
     "reviewThinking": "high"
   },

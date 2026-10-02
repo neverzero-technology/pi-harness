@@ -183,7 +183,7 @@ The profile takes effect for everyone when that pull request merges. Until then 
 - **Guest toolchain.** The stock guest image has bash, Python, Node and npm, plus git installed at session start. It has no `make`, Go, Docker or `gh`. A repository whose verify gate needs those cannot run it in the sandbox, so the agent would have to record those checks as unavailable. Build a custom Gondolin image with the toolchain (and git, to drop the per-session install) before piloting there.
 - **`linear.teamKey`** is `ENG` as a placeholder. Set the real team key and the exact workflow state names; `/team doctor` checks both.
 - **Labels**: create `blocked` and a `repo:<name>` label for each repository in Linear. `/team doctor` checks them for the repository you are in.
-- **`model.id`**: `openai-codex/gpt-5.5` is provisional until every account is confirmed to have access to it.
+- **`model.id`**: `openai-codex/gpt-6.1-sol` is provisional until every account is confirmed to have access to it.
 - **Package scope and registry**: `package.json` is `"private": true` so it cannot be published by accident. Remove that only under explicit publication authority.
 
 

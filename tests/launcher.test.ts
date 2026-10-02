@@ -11,6 +11,7 @@ import { tempDir, write } from "./helpers.ts";
 const launcher = fileURLToPath(new URL("../bin/pi-team.mjs", import.meta.url));
 // The host version the package is pinned to; the stand-in Pi reports it so no mismatch warning is printed.
 const PI_VERSION = loadTeamConfig().host.piVersion;
+const TEAM_MODEL = loadTeamConfig().model.id;
 
 function fakePi(version: string): string {
 	const dir = tempDir();
@@ -33,7 +34,7 @@ test("launcher isolates resources and pins the model", () => {
 	for (const flag of ["--no-approve", "--no-extensions", "--no-skills", "--no-prompt-templates"]) assert.ok(args.includes(flag), flag);
 	assert.ok(args[args.indexOf("--extension") + 1].endsWith("extensions/team.ts"));
 	assert.ok(args[args.indexOf("--skill") + 1].endsWith("skills"));
-	assert.equal(args[args.indexOf("--model") + 1], "openai-codex/gpt-5.5");
+	assert.equal(args[args.indexOf("--model") + 1], TEAM_MODEL);
 	assert.equal(args.at(-1), "--continue");
 	assert.ok(!args.includes("--no-context-files"), "repo AGENTS.md files carry the domain invariants");
 });
@@ -47,7 +48,7 @@ test("an explicit --model is respected; --provider is only accepted with it", ()
 	assert.throws(() => launch(PI_VERSION, "--provider", "anthropic"), /--provider needs --model/);
 	// After `--` the same words are message text, so the team model still applies.
 	const { args } = launch(PI_VERSION, "--", "--model");
-	assert.equal(args[args.indexOf("--model") + 1], "openai-codex/gpt-5.5");
+	assert.equal(args[args.indexOf("--model") + 1], TEAM_MODEL);
 });
 
 test("a missing host fails clearly", () => {

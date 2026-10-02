@@ -409,7 +409,7 @@ describe("pi-team under a real Pi host", { skip: !enabled && "set PI_TEAM_E2E=1"
 
 			const args = readFileSync(join(capture, "args"), "utf8");
 			assert.match(args, /--extension .*extensions\/reviewer\.ts/);
-			for (const flag of ["--no-extensions", "--no-skills", "--no-session", "--tools read,grep,find,ls", "--model openai-codex/gpt-5.5", "--thinking high"]) {
+			for (const flag of ["--no-extensions", "--no-skills", "--no-session", "--tools read,grep,find,ls", `--model ${loadTeamConfig().model.id}`, "--thinking high"]) {
 				assert.ok(args.includes(flag), `${flag} in ${args}`);
 			}
 			const packet = readFileSync(join(capture, "packet.md"), "utf8");
