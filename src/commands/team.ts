@@ -105,7 +105,7 @@ async function doctor(team: Team, ctx: ExtensionCommandContext): Promise<void> {
 			const viewer = await team.viewer();
 			add("ok", "Linear identity", `${viewer.name} <${viewer.email}> via ${key.source.startsWith("/") ? "key file" : key.source}`);
 			const linearTeam = await linear.team(config.linear.teamKey);
-			if (!linearTeam) add("fail", "Linear team", `No team with key ${config.linear.teamKey} (team.json linear.teamKey; the team should be "${config.linear.teamName}")`);
+			if (!linearTeam) add("fail", "Linear team", `No team with key ${config.linear.teamKey} (linear.teamKey in ${teamConfigPath()}; the team should be "${config.linear.teamName}")`);
 			else {
 				const named = linearTeam.name.toLowerCase() === config.linear.teamName.toLowerCase();
 				add(named ? "ok" : "fail", "Linear team", named ? `${linearTeam.name} (${linearTeam.key})` : `Key ${linearTeam.key} belongs to "${linearTeam.name}", not "${config.linear.teamName}" (team.json linear.teamName / teamKey)`);

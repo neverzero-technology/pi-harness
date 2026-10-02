@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync, utimesSync, writeFileSync } from "node:fs";
 import { test } from "node:test";
 import { ADOPT_BRANCH, adoptionPrBody, formatInventory, inventory, parseNameStatus, unaccountedDeletions } from "../src/discover.ts";
 import { guardToolCall, type GuardInput } from "../src/modes.ts";
@@ -91,6 +92,10 @@ test("the profile is writable only during /discover, and discover never touches 
 	for (const path of ["src/index.ts", "Makefile", "package.json", "scripts/verify", "services/api/AGENTS.md"]) {
 		assert.equal(run({ mode: "discover", input: { path } }), "block", path);
 	}
+	// The profile is the only workflow file a repository holds; an invented settings file is refused.
+	const stray = guardToolCall({ ...base, mode: "discover", input: { path: ".pi-team/team.json" } });
+	assert.equal(stray.action, "block");
+	assert.match(stray.action === "block" ? stray.reason : "", /team-wide settings such as the Linear team live in the harness/);
 	assert.equal(run({ mode: "discover", generated: ["docs/generated/**"], input: { path: "docs/generated/api.md" } }), "block", "generated files stay protected");
 	for (const tool of ["team_discover_report", "team_project_populate"]) {
 		assert.equal(run({ toolName: tool, input: {} }), "block", tool);
@@ -412,5 +417,57 @@ test("once merged, the profile rules every session and the agent cannot edit it"
 		write(root, PROFILE_PATH, JSON.stringify({ ...PROFILE, generated: [] }));
 		const tampered = await session(root);
 		assert.equal((await call(tampered.h, "templates/generated/x.yaml"))?.block, true);
+	});
+});
+
+test("team settings are re-read when team.json changes, and errors say where they live", async () => {
+	await withLinear(async (linear) => {
+		await withGh(async () => {
+			const { root } = legacyRepo();
+			const { discover, tool } = await session(root);
+			await discover();
+			adopt(root);
+			const file = process.env.PI_TEAM_CONFIG!;
+			const original = readFileSync(file, "utf8");
+			try {
+				// The session is open; someone points the harness at a team this account cannot see.
+				const config = JSON.parse(original);
+				writeFileSync(file, JSON.stringify({ ...config, linear: { ...config.linear, teamName: "Operations", teamKey: "OPS" } }));
+				utimesSync(file, new Date(), new Date(Date.now() + 5000));
+				await assert.rejects(tool("team_project_populate", PROPOSAL), (error: Error) => {
+					assert.match(error.message, /Linear has no team with the key OPS \("Operations"\) for this account/);
+					assert.match(error.message, new RegExp(`live in the harness's own ${file.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}, not in any repository`));
+					assert.match(error.message, /Stop and tell the human; do not try to configure this from the repository/);
+					return true;
+				});
+				assert.equal(linear.projects.length, 0);
+
+				// The person fixes team.json; the same open session picks it up.
+				writeFileSync(file, original);
+				utimesSync(file, new Date(), new Date(Date.now() + 10000));
+				const made = await tool("team_project_populate", PROPOSAL);
+				assert.equal(made.isError, undefined, made.content[0].text);
+				assert.equal(linear.projects.length, 1);
+			} finally {
+				writeFileSync(file, original);
+			}
+		});
+	});
+});
+
+test("a stray file under .pi-team/ stops the pull request", async () => {
+	await withLinear(async () => {
+		await withGh(async () => {
+			const { root } = legacyRepo();
+			const { discover, tool, report } = await session(root);
+			await discover();
+			adopt(root);
+			write(root, ".pi-team/team.json", '{ "linear": { "teamKey": "NEV" } }');
+			git(root, "add", "-A");
+			git(root, "commit", "-qm", "Adopt");
+			await tool("team_discover_report", REPORT);
+			await discover("pr");
+			assert.match(report(), /✗ \.pi-team\/team\.json: the workflow reads only \.pi-team\/profile\.json; remove anything else under \.pi-team\//);
+		});
 	});
 });

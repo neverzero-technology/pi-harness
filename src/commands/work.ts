@@ -308,7 +308,7 @@ async function block(team: Team, arg: string, ctx: ExtensionCommandContext): Pro
 	if (issue.assignee?.id !== viewer.id) throw new TeamError(`${key} is not assigned to you; raise the blocker with its owner or comment in Linear`);
 	const linear = team.linear();
 	const labelId = await linear.labelId(team.config.linear.blockedLabel, issue.team.id);
-	if (!labelId) throw new TeamError(`No "${team.config.linear.blockedLabel}" label in Linear; create it or fix team.json`);
+	if (!labelId) throw new TeamError(`Linear has no "${team.config.linear.blockedLabel}" label; create it in Linear. ${team.settingsHint()}`);
 	const comment = clear
 		? `**Unblocked** (pi-team)${reason ? `: ${reason}` : ""}`
 		: `**Blocked** (pi-team): ${reason}\n\nWorkflow state is unchanged; the label and this comment keep the blocker visible.`;

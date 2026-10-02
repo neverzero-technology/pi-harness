@@ -7,7 +7,7 @@ import { ADOPT_BRANCH, adoptionPrBody, type DiscoverReport, formatInventory, inv
 import type { IssueRef } from "../linear.ts";
 import { isOpen, LinearError } from "../linear.ts";
 import { formatMetadata, parseMetadata } from "../metadata.ts";
-import { PROFILE_GUIDE, PROFILE_PATH } from "../profile.ts";
+import { PROFILE_DIR, PROFILE_GUIDE, PROFILE_PATH } from "../profile.ts";
 import { errorText, type RepoContext, type Team, TeamError } from "../runtime.ts";
 
 const text = (value: string, isError = false) => ({
@@ -154,6 +154,8 @@ async function readiness(team: Team, ctx: ExtensionCommandContext): Promise<Read
 		const unmatched = repo.profile.generated.filter((glob) => !tracked.some((file) => globToRegExp(glob).test(file)));
 		if (unmatched.length) notes.push(`Generated-path patterns that match no tracked file (they should name checked-in generated files, not build output): ${unmatched.join(", ")}`);
 	}
+	const stray = changes.filter((c) => c.status !== "D" && (c.to ?? c.path).startsWith(`${PROFILE_DIR}/`) && (c.to ?? c.path) !== PROFILE_PATH).map((c) => c.to ?? c.path);
+	if (stray.length) problems.push(`${stray.join(", ")}: the workflow reads only ${PROFILE_PATH}; remove anything else under ${PROFILE_DIR}/`);
 	if (!state.report) problems.push("No adoption report; the agent files it with team_discover_report");
 	const unaccounted = unaccountedDeletions(changes, state.report);
 	if (unaccounted.length) {
@@ -286,7 +288,9 @@ function registerDiscoverTools(team: Team): void {
 			const linearClient = team.linear();
 			const teamKey = team.config.linear.teamKey;
 			const linearTeam = await linearClient.team(teamKey);
-			if (!linearTeam) throw new TeamError(`Linear team ${teamKey} not found (team.json linear.teamKey)`);
+			if (!linearTeam) {
+				throw new TeamError(`Linear has no team with the key ${teamKey} ("${team.config.linear.teamName}") for this account. ${team.settingsHint()} Stop and tell the human; do not try to configure this from the repository.`);
+			}
 			const existingProject = await linearClient.project(params.project.name);
 			const matches = params.issues.length
 				? await linearClient.issues({ team: { key: { eq: teamKey } }, or: params.issues.map((i) => ({ description: { contains: i.source } })) }, 500)

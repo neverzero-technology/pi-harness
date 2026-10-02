@@ -1,11 +1,11 @@
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import type { Checkpoint } from "./checkpoint.ts";
 import { containsCheckpoint, formatCheckpoint, newCheckpointId } from "./checkpoint.ts";
 import type { LogicalState, TeamConfig } from "./config.ts";
-import { loadTeamConfig, PACKAGE_ROOT } from "./config.ts";
+import { loadTeamConfig, PACKAGE_ROOT, teamConfigPath } from "./config.ts";
 import { type LoadedProfile, loadProfile, type Profile } from "./profile.ts";
 import { branchIssue, Git, GitHub, type WorkingState } from "./git.ts";
 import type { Issue, WorkflowState } from "./linear.ts";
@@ -48,7 +48,7 @@ export interface Viewer {
 
 export class Team {
 	sandbox: SandboxHandle | undefined;
-	readonly config: TeamConfig;
+	private loaded: { path: string; mtimeMs: number; config: TeamConfig };
 	state: SessionState = { mode: "implement" };
 	repo: RepoContext | undefined;
 	// HEAD at the last checkpoint this session stored; used to warn before context is compacted.
@@ -63,7 +63,29 @@ export class Team {
 
 	constructor(pi: ExtensionAPI) {
 		this.pi = pi;
-		this.config = loadTeamConfig();
+		const path = teamConfigPath();
+		this.loaded = { path, mtimeMs: statSync(path).mtimeMs, config: loadTeamConfig() };
+	}
+
+	// Team settings are read again whenever team.json changes, so a session that is already open follows an
+	// edit (a new Linear team, a renamed state) without a restart. A half-written file keeps the last good copy.
+	get config(): TeamConfig {
+		try {
+			const path = teamConfigPath();
+			const mtimeMs = statSync(path).mtimeMs;
+			if (path !== this.loaded.path || mtimeMs !== this.loaded.mtimeMs) {
+				this.loaded = { path, mtimeMs, config: loadTeamConfig() };
+				this.stateCache.clear();
+			}
+		} catch {
+			// keep the last good settings
+		}
+		return this.loaded.config;
+	}
+
+	// Where team-wide settings live. Said in every error about them, so nobody looks for them in a repository.
+	settingsHint(): string {
+		return `Team-wide settings (Linear team, state names, labels, model) live in the harness's own ${this.loaded.path}, not in any repository. Only a person can change them; they take effect immediately.`;
 	}
 
 	resource(...parts: string[]): string {
@@ -154,7 +176,7 @@ export class Team {
 		}
 		const states = await this.stateCache.get(teamKey)!;
 		const state = states.find((s) => s.name.toLowerCase() === name.toLowerCase());
-		if (!state) throw new TeamError(`Linear team ${teamKey} has no workflow state named "${name}" (team.json linear.states.${logical})`);
+		if (!state) throw new TeamError(`Linear team ${teamKey} has no workflow state named "${name}" (linear.states.${logical}). ${this.settingsHint()}`);
 		return state.id;
 	}
 

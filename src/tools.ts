@@ -260,7 +260,7 @@ export function registerTools(team: Team): void {
 			}
 
 			const teamInfo = lead?.team ?? (await linear.team(teamKey));
-			if (!teamInfo) throw new TeamError(`Linear team ${teamKey} not found`);
+			if (!teamInfo) throw new TeamError(`Linear has no team with the key ${teamKey} for this account. ${team.settingsHint()} Stop and tell the human.`);
 			const readyId = await team.stateId(teamKey, "ready");
 			const backlogId = await team.stateId(teamKey, "backlog");
 			const labelCache = new Map<string, string | undefined>();

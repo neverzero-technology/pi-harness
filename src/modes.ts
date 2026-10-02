@@ -14,7 +14,7 @@ export type Mode = "implement" | "spec" | "review" | "discover";
 export const MODES: Mode[] = ["implement", "spec", "review", "discover"];
 
 // Adoption (/discover) rewrites workflow configuration and documents, never product source.
-const DISCOVER_PATHS = [".pi-team/**", "docs/**", ".github/**", "*.md"];
+const DISCOVER_PATHS = [".pi-team/profile.json", "docs/**", ".github/**", "*.md"];
 // Tools that only make sense while a repository is being adopted.
 const DISCOVER_TOOLS = new Set(["team_discover_report", "team_project_populate"]);
 
@@ -89,6 +89,9 @@ export function guardToolCall(g: GuardInput): GuardDecision {
 	}
 	if (g.mode === "discover") {
 		if (insideRepo && matches(DISCOVER_PATHS)) return { action: "allow" };
+		if (insideRepo && matches([".pi-team/**"])) {
+			return { action: "block", reason: `${rel} is not a file the workflow reads. A repository holds only .pi-team/profile.json; team-wide settings such as the Linear team live in the harness and are changed by a person, not per repository.` };
+		}
 		return { action: "block", reason: `Discover mode only edits workflow configuration and documents (${DISCOVER_PATHS.join(", ")}), not product source` };
 	}
 	if (g.mode === "spec") {

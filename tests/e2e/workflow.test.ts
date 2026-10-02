@@ -76,7 +76,7 @@ describe("pi-team under a real Pi host", { skip: !enabled && "set PI_TEAM_E2E=1"
 		const report = (await f.session().run("/team doctor")).messages.join("\n");
 		f.linear.team.key = "ENG";
 		f.linear.labels = ["blocked", "repo:acme-app", "repo:other-app"];
-		assert.match(report, /✗ Linear team: No team with key ENG \(team\.json linear\.teamKey; the team should be "Engineering"\)/);
+		assert.match(report, /✗ Linear team: No team with key ENG \(linear\.teamKey in .*team\.json; the team should be "Engineering"\)/);
 		// The right key on a differently named team is also a misconfiguration.
 		f.linear.team.name = "Platform";
 		const renamed = (await f.session().run("/team doctor")).messages.join("\n");

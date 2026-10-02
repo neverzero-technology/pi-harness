@@ -9,6 +9,8 @@ You are converting a repository to the team workflow in one reviewable pull requ
 
 You change workflow configuration and documents only. Never edit product source, tests, build files or CI.
 
+The only workflow file a repository holds is `.pi-team/profile.json`. The Linear team, state names, labels and model are team-wide settings in the harness itself; they are not set per repository and you cannot change them. If a tool reports that the Linear team, a state or a label is missing, stop and tell the human exactly what it said. Do not create other configuration files or try another route.
+
 ## 1. Read before writing
 
 Work from the inventory the command printed, then look further:
