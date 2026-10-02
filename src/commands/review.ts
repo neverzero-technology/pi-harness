@@ -6,7 +6,7 @@ import { reviewVerdict } from "../pending.ts";
 import { buildReviewPacket, MAX_DIFF_BYTES, runReviewer } from "../review.ts";
 
 export function registerReview(team: Team): void {
-	team.pi.registerCommand("review", {
+	team.registerCommand("review", {
 		description: "Fresh-context, read-only agent review of the current change against its acceptance",
 		handler: async (args, ctx) => {
 			try {

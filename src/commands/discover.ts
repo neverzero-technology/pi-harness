@@ -19,7 +19,7 @@ const text = (value: string, isError = false) => ({
 const SUBCOMMANDS = ["scan", "linear", "status", "pr"];
 
 export function registerDiscover(team: Team): void {
-	team.pi.registerCommand("discover", {
+	team.registerCommand("discover", {
 		description: "Adopt this workflow in an existing repository: scan | linear | status | pr",
 		getArgumentCompletions: (prefix) => SUBCOMMANDS.filter((s) => s.startsWith(prefix)).map((s) => ({ value: s, label: s })),
 		handler: async (args, ctx) => {

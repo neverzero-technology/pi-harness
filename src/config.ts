@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync, statSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -27,6 +27,24 @@ export function teamConfigPath(root = PACKAGE_ROOT): string {
 
 export function loadTeamConfig(root = PACKAGE_ROOT): TeamConfig {
 	return JSON.parse(readFileSync(teamConfigPath(root), "utf8")) as TeamConfig;
+}
+
+// The newest modification time among the harness's own code and prompts. A session compares it with the
+// value at load time to tell when it is running an older copy than the one on disk.
+export function packageStamp(root = PACKAGE_ROOT): number {
+	let newest = 0;
+	const visit = (path: string) => {
+		let stat: ReturnType<typeof statSync>;
+		try {
+			stat = statSync(path);
+		} catch {
+			return;
+		}
+		if (stat.isDirectory()) for (const entry of readdirSync(path)) visit(join(path, entry));
+		else newest = Math.max(newest, stat.mtimeMs);
+	};
+	for (const dir of ["extensions", "src", "skills", "review", "templates"]) visit(join(root, dir));
+	return newest;
 }
 
 export function readPackageVersion(root = PACKAGE_ROOT): string {

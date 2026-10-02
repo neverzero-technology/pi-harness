@@ -34,6 +34,8 @@ export function registerTeam(pi: ExtensionAPI, sandboxOptions?: SandboxOptions):
 			if (issue) team.state = { ...team.state, issue };
 		}
 		team.showStatus(ctx);
+		// A fresh runtime is, by definition, running the code on disk.
+		if (ctx.hasUI) ctx.ui.setStatus("pi-team-stale", undefined);
 		if (repo && ctx.hasUI) {
 			if (repo.profileState.errors.length) ctx.ui.notify(`The repository profile is invalid (${repo.profileState.errors[0]}); /team doctor has the details.`, "warning");
 			else if (!repo.profile) ctx.ui.notify("This repository has not adopted the workflow yet (no .pi-team/profile.json). Run /discover.", "info");
@@ -75,7 +77,18 @@ export function registerTeam(pi: ExtensionAPI, sandboxOptions?: SandboxOptions):
 		team.showStatus(ctx);
 	});
 
+	const warnIfStale = (ctx: { hasUI: boolean; ui: { notify(message: string, type?: "info" | "warning" | "error"): void; setStatus(key: string, text: string | undefined): void } }) => {
+		const notice = team.staleNotice();
+		if (!notice || !ctx.hasUI) return;
+		ctx.ui.notify(notice, "warning");
+		ctx.ui.setStatus("pi-team-stale", "pi-team outdated: /reload");
+	};
+	pi.on("input", async (_event, ctx) => {
+		warnIfStale(ctx);
+	});
+
 	pi.on("tool_call", async (event, ctx) => {
+		warnIfStale(ctx);
 		const input = event.input as Record<string, unknown>;
 		const decision = guardToolCall({
 			mode: team.state.mode,

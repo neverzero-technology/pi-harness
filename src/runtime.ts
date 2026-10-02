@@ -5,7 +5,7 @@ import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-a
 import type { Checkpoint } from "./checkpoint.ts";
 import { containsCheckpoint, formatCheckpoint, newCheckpointId } from "./checkpoint.ts";
 import type { LogicalState, TeamConfig } from "./config.ts";
-import { loadTeamConfig, PACKAGE_ROOT, teamConfigPath } from "./config.ts";
+import { loadTeamConfig, PACKAGE_ROOT, packageStamp, teamConfigPath } from "./config.ts";
 import { type LoadedProfile, loadProfile, type Profile } from "./profile.ts";
 import { branchIssue, Git, GitHub, type WorkingState } from "./git.ts";
 import type { Issue, WorkflowState } from "./linear.ts";
@@ -49,6 +49,10 @@ export interface Viewer {
 export class Team {
 	sandbox: SandboxHandle | undefined;
 	private loaded: { path: string; mtimeMs: number; config: TeamConfig };
+	private readonly stamp: () => number;
+	private readonly codeStamp: number;
+	private staleChecked = 0;
+	private staleReported = 0;
 	state: SessionState = { mode: "implement" };
 	repo: RepoContext | undefined;
 	// HEAD at the last checkpoint this session stored; used to warn before context is compacted.
@@ -61,8 +65,10 @@ export class Team {
 
 	readonly pi: ExtensionAPI;
 
-	constructor(pi: ExtensionAPI) {
+	constructor(pi: ExtensionAPI, stamp: () => number = packageStamp) {
 		this.pi = pi;
+		this.stamp = stamp;
+		this.codeStamp = stamp();
 		const path = teamConfigPath();
 		this.loaded = { path, mtimeMs: statSync(path).mtimeMs, config: loadTeamConfig() };
 	}
@@ -81,6 +87,37 @@ export class Team {
 			// keep the last good settings
 		}
 		return this.loaded.config;
+	}
+
+	// Every command first says if this session is running outdated code. (Pi does not send the `input`
+	// event for extension commands, so this is the one place all of them pass through.)
+	registerCommand(name: string, options: Parameters<ExtensionAPI["registerCommand"]>[1]): void {
+		this.pi.registerCommand(name, {
+			...options,
+			handler: async (args, ctx) => {
+				const notice = this.staleNotice();
+				if (notice && ctx.hasUI) {
+					ctx.ui.notify(notice, "warning");
+					ctx.ui.setStatus("pi-team-stale", "pi-team outdated: /reload");
+				}
+				return options.handler(args, ctx);
+			},
+		});
+	}
+
+	// A session keeps running the code it loaded. When the harness has been updated on disk since then,
+	// say so once per update, so nobody debugs a fix that this session has not picked up.
+	staleNotice(now = Date.now()): string | undefined {
+		if (now - this.staleChecked < 3000) return undefined;
+		this.staleChecked = now;
+		const stamp = this.stamp();
+		if (stamp <= this.codeStamp || stamp === this.staleReported) return undefined;
+		this.staleReported = stamp;
+		return "pi-team was updated on disk after this session loaded it, so this session is still running the older code. Run /reload (or restart) to use the new version.";
+	}
+
+	isStale(): boolean {
+		return this.stamp() > this.codeStamp;
 	}
 
 	// Where team-wide settings live. Said in every error about them, so nobody looks for them in a repository.

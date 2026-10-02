@@ -1,9 +1,12 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { globToRegExp, loadTeamConfig, matchesAny, repoNameFromOrigin } from "../src/config.ts";
+import { utimesSync } from "node:fs";
+import { join } from "node:path";
+import { globToRegExp, loadTeamConfig, matchesAny, packageStamp, repoNameFromOrigin } from "../src/config.ts";
+import { Team } from "../src/runtime.ts";
 import { Git } from "../src/git.ts";
 import { loadProfile, parseProfile, PROFILE_PATH } from "../src/profile.ts";
-import { git, PROFILE, profiledRepo, realExec, write } from "./helpers.ts";
+import { git, PROFILE, profiledRepo, realExec, tempDir, write } from "./helpers.ts";
 
 test("the repository name comes from any form of origin URL", () => {
 	for (const url of ["https://github.com/acme/acme-app.git", "git@github.com:acme/acme-app.git", "ssh://git@github.com/acme/acme-app", "/srv/git/acme-app.git/", "acme-app"]) {
@@ -104,4 +107,31 @@ test("the default branch is detected from origin", async () => {
 	git(origin, "symbolic-ref", "HEAD", "refs/heads/trunk");
 	git(root, "remote", "set-head", "origin", "--auto");
 	assert.equal(await g.defaultBranch(), "trunk");
+});
+
+test("a session can tell when the harness on disk is newer than the code it loaded", () => {
+	// The stamp is the newest file time under the code and prompt directories.
+	const root = tempDir();
+	write(root, "src/a.ts", "a");
+	write(root, "skills/x/SKILL.md", "s");
+	write(root, "README.md", "not code");
+	const before = packageStamp(root);
+	utimesSync(join(root, "README.md"), new Date(), new Date(Date.now() + 60_000));
+	assert.equal(packageStamp(root), before, "files outside the code and prompt directories do not count");
+	utimesSync(join(root, "skills/x/SKILL.md"), new Date(), new Date(Date.now() + 60_000));
+	assert.ok(packageStamp(root) > before);
+	assert.equal(packageStamp(join(root, "missing")), 0);
+
+	// The session reports each update once, and not more often than every few seconds.
+	let onDisk = 100;
+	const team = new Team({} as never, () => onDisk);
+	assert.equal(team.staleNotice(10_000), undefined);
+	assert.equal(team.isStale(), false);
+	onDisk = 200;
+	assert.equal(team.staleNotice(11_000), undefined, "checked at most every three seconds");
+	assert.match(team.staleNotice(14_000) ?? "", /updated on disk after this session loaded it.*Run \/reload/);
+	assert.equal(team.staleNotice(20_000), undefined, "said once per update");
+	assert.equal(team.isStale(), true);
+	onDisk = 300;
+	assert.match(team.staleNotice(30_000) ?? "", /Run \/reload/);
 });

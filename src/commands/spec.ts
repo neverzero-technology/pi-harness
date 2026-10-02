@@ -48,7 +48,7 @@ function target(team: Team, repo: RepoContext, arg: string): string {
 export function registerSpec(team: Team): void {
 	const skill = (name: string) => team.resource("skills", name, "SKILL.md");
 
-	team.pi.registerCommand("spec", {
+	team.registerCommand("spec", {
 		description: "Change specifications: draft <issue|idea> | lint [path] | plan <path>",
 		getArgumentCompletions: (prefix) =>
 			["draft", "lint", "plan"].filter((s) => s.startsWith(prefix)).map((s) => ({ value: s, label: s })),
@@ -111,7 +111,7 @@ export function registerSpec(team: Team): void {
 		}),
 	});
 
-	team.pi.registerCommand("grill", {
+	team.registerCommand("grill", {
 		description: "Interview the human about a spec or epic, one question at a time",
 		handler: wrap(team, "grill", async (arg, ctx) => {
 			const repo = await team.requireRepo(ctx);
@@ -126,7 +126,7 @@ export function registerSpec(team: Team): void {
 		}),
 	});
 
-	team.pi.registerCommand("align", {
+	team.registerCommand("align", {
 		description: "Check a spec or issue against architecture, source and producer/consumer contracts",
 		handler: wrap(team, "align", async (arg, ctx) => {
 			const repo = await team.requireRepo(ctx);

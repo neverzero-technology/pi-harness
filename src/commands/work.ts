@@ -12,7 +12,7 @@ import { evaluateFinish, evaluateStart, formatFinish, specStaleness } from "../w
 const SUBCOMMANDS = ["next", "start", "status", "checkpoint", "block", "resume", "push", "finish"];
 
 export function registerWork(team: Team): void {
-	team.pi.registerCommand("work", {
+	team.registerCommand("work", {
 		description: "Coordinate one issue: next | start | status | checkpoint | block | resume | push | finish",
 		getArgumentCompletions: (prefix) =>
 			SUBCOMMANDS.filter((s) => s.startsWith(prefix)).map((s) => ({ value: s, label: s })),

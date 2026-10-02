@@ -7,7 +7,7 @@ import { errorText, type Team, TeamError } from "../runtime.ts";
 import { SANDBOX_TOOLS } from "../sandbox.ts";
 
 export function registerTeamCommand(team: Team): void {
-	team.pi.registerCommand("team", {
+	team.registerCommand("team", {
 		description: "Team workflow: doctor | status | version | setup | mode <implement|spec|review>",
 		getArgumentCompletions: (prefix) =>
 			["doctor", "status", "version", "setup", "mode"].filter((s) => s.startsWith(prefix)).map((s) => ({ value: s, label: s })),
@@ -69,6 +69,7 @@ async function doctor(team: Team, ctx: ExtensionCommandContext): Promise<void> {
 	const { config } = team;
 
 	add("ok", "Package", `@neverzero/pi-team ${readPackageVersion()} (${PACKAGE_ROOT})`);
+	if (team.isStale()) add("warn", "Loaded code", "The harness was updated on disk after this session loaded it; run /reload to use the new version");
 	if (process.env.PI_TEAM_CONFIG) add("warn", "Team config", `${teamConfigPath()} (PI_TEAM_CONFIG), not the package's team.json`);
 	const host = await hostVersion();
 	add(host === config.host.piVersion ? "ok" : "warn", "Pi host", `${host} (tested: ${config.host.piVersion})`);
